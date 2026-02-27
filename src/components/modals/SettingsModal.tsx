@@ -151,47 +151,45 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
           <div style={styles.tabContent}>
             <Field label="外观">
               <div style={styles.themeCards}>
-                {/* 浅色模式 - 太阳（暖色调） */}
-                <div
-                  style={{
-                    ...styles.themeCard,
-                    ...(form.theme === 'light' ? styles.themeCardSelected : {}),
-                  }}
-                  onClick={() => set('theme', 'light')}
-                >
-                  <div style={{ ...styles.themeCardIcon, color: '#ffa940' }}>
-                    <SunIcon size={28} />
-                  </div>
-                  <div style={styles.themeCardLabel}>浅色</div>
-                </div>
-                
-                {/* 深色模式 - 月亮（蓝白色调） */}
-                <div
-                  style={{
-                    ...styles.themeCard,
-                    ...(form.theme === 'dark' ? styles.themeCardSelected : {}),
-                  }}
-                  onClick={() => set('theme', 'dark')}
-                >
-                  <div style={{ ...styles.themeCardIcon, color: '#40a9ff' }}>
-                    <MoonIcon size={28} />
-                  </div>
-                  <div style={styles.themeCardLabel}>黑暗</div>
-                </div>
-                
-                {/* 系统模式 */}
-                <div
-                  style={{
-                    ...styles.themeCard,
-                    ...(form.theme === 'system' ? styles.themeCardSelected : {}),
-                  }}
-                  onClick={() => set('theme', 'system')}
-                >
-                  <div style={{ ...styles.themeCardIcon, color: '#667eea' }}>
-                    <DesktopIcon size={28} />
-                  </div>
-                  <div style={styles.themeCardLabel}>系统</div>
-                </div>
+                {([
+                  { key: 'light' as const, label: '浅色', icon: <SunIcon size={13} /> },
+                  { key: 'dark'  as const, label: '黑暗', icon: <MoonIcon size={13} /> },
+                  { key: 'system' as const, label: '系统', icon: <DesktopIcon size={13} /> },
+                ]).map(({ key, label, icon }) => {
+                  const selected = form.theme === key
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => set('theme', key)}
+                      style={{ flex: 1, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}
+                    >
+                      {/* Mini UI 预览框 */}
+                      <div style={{
+                        width: '100%',
+                        height: 104,
+                        borderRadius: 10,
+                        border: selected ? '2.5px solid #0094fc' : '2px solid var(--border-medium)',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        boxShadow: selected ? '0 0 0 3px rgba(0,148,252,0.18)' : 'none',
+                        transition: 'border-color 0.15s, box-shadow 0.15s',
+                      }}>
+                        <MiniThemePreview mode={key} />
+                      </div>
+                      {/* 标签 */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        fontSize: 12.5,
+                        color: selected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        fontWeight: selected ? 500 : 400,
+                        transition: 'color 0.15s',
+                      }}>
+                        {icon}
+                        <span>{label}</span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </Field>
           </div>
@@ -535,6 +533,128 @@ function NavItem({ active, onClick, icon, children }: { active: boolean; onClick
   )
 }
 
+// ─── 主题 Mini UI 预览 ─────────────────────────────────────────────────────────
+
+const THEME_SCHEME = {
+  light: {
+    bg: '#f5f5f5',
+    sidebar: '#ebebeb',
+    sidebarBorder: '#e0e0e0',
+    navItem: '#d4d4d4',
+    tabBar: '#e8e8e8',
+    bar1: '#d8d8d8',
+    bar2: '#e2e2e2',
+    inputBg: '#efefef',
+    runBg: '#ffffff',
+    runColor: '#1a1a1a',
+    runShadow: '0 1px 3px rgba(0,0,0,0.14)',
+    iconColor: '#c8c8c8',
+  },
+  dark: {
+    bg: '#1c1c1c',
+    sidebar: '#252525',
+    sidebarBorder: '#303030',
+    navItem: '#3d3d3d',
+    tabBar: '#222222',
+    bar1: '#3a3a3a',
+    bar2: '#313131',
+    inputBg: '#2a2a2a',
+    runBg: '#ffffff',
+    runColor: '#1a1a1a',
+    runShadow: '0 1px 4px rgba(0,0,0,0.4)',
+    iconColor: '#404040',
+  },
+}
+
+function MiniThemePane({ s, clipLeft, clipRight }: {
+  s: typeof THEME_SCHEME.light
+  clipLeft?: boolean
+  clipRight?: boolean
+}) {
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0, bottom: 0,
+      left: clipRight ? '50%' : 0,
+      right: clipLeft ? '50%' : 0,
+      background: s.bg,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
+      {/* Tab bar 顶部 */}
+      <div style={{ height: 16, background: s.tabBar, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 8px', gap: 4 }}>
+        <div style={{ width: 28, height: 6, borderRadius: 3, background: s.navItem }} />
+        <div style={{ width: 20, height: 6, borderRadius: 3, background: s.sidebarBorder }} />
+      </div>
+
+      {/* 主体区域：侧边栏 + 内容 */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* 侧边栏 */}
+        <div style={{ width: 26, background: s.sidebar, borderRight: `1px solid ${s.sidebarBorder}`, flexShrink: 0, padding: '7px 4px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {[100, 70, 70, 80].map((w, i) => (
+            <div key={i} style={{ height: 4, borderRadius: 2, background: s.navItem, width: `${w}%` }} />
+          ))}
+          <div style={{ flex: 1 }} />
+          {/* 底部用户头像占位 */}
+          <div style={{ width: 14, height: 14, borderRadius: '50%', background: s.navItem, alignSelf: 'center' }} />
+        </div>
+
+        {/* 内容区 */}
+        <div style={{ flex: 1, padding: '8px 8px 6px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden' }}>
+          {/* 内容占位条 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ height: 5, borderRadius: 2.5, background: s.bar1, width: '82%' }} />
+            <div style={{ height: 5, borderRadius: 2.5, background: s.bar2, width: '58%' }} />
+            <div style={{ height: 5, borderRadius: 2.5, background: s.bar2, width: '70%' }} />
+          </div>
+
+          {/* 底部输入栏 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: s.inputBg, borderRadius: 6, padding: '3px 5px' }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.iconColor }} />
+            {/* Run 按钮 */}
+            <div style={{
+              background: s.runBg,
+              color: s.runColor,
+              borderRadius: 6,
+              padding: '1.5px 5px',
+              fontSize: 6,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              boxShadow: s.runShadow,
+              lineHeight: 1.5,
+              letterSpacing: 0.2,
+            }}>
+              <svg width="5" height="5" viewBox="0 0 8 8" fill="none">
+                <path d="M4 7V1M1 4l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Run
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MiniThemePreview({ mode }: { mode: 'light' | 'dark' | 'system' }) {
+  if (mode === 'system') {
+    return (
+      <>
+        <MiniThemePane s={THEME_SCHEME.light} clipLeft />
+        {/* 中间分割线 */}
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, background: 'rgba(128,128,128,0.25)', zIndex: 1 }} />
+        <MiniThemePane s={THEME_SCHEME.dark} clipRight />
+      </>
+    )
+  }
+  return <MiniThemePane s={THEME_SCHEME[mode]} />
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 function DesktopRow({ label, desc, control, last }: { label: string; desc?: string; control: React.ReactNode; last?: boolean }) {
   return (
     <div style={{
@@ -811,7 +931,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer', fontSize: 13.5, color: 'var(--text-primary)',
   },
   themeCards: {
-    display: 'flex', gap: 12, marginBottom: 16,
+    display: 'flex', gap: 14, marginBottom: 8,
   },
   themeCard: {
     flex: 1,
