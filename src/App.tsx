@@ -81,14 +81,15 @@ function AppContent() {
     const conv = conversations.find(c => c.id === convId)
     if (!conv) return
 
-    // 检查该对话是否已有关联的 tab
-    if (conv.tabId) {
-      // 已存在，直接切换到该 tab
-      setActiveTabId(conv.tabId)
+    // 检查该对话是否已有关联的 tab 且该 tab 仍存在
+    const existingTab = conv.tabId ? tabs.find(t => t.id === conv.tabId) : null
+    if (existingTab) {
+      // tab 仍存在，直接切换
+      setActiveTabId(existingTab.id)
       setActiveId(convId)
       setPage('chat')
     } else {
-      // 不存在，创建新 tab 并关联
+      // tab 不存在或已关闭，创建新 tab 并关联
       const tabId = `tab-${Date.now()}`
       const newTab: Tab = {
         id: tabId,
@@ -100,12 +101,11 @@ function AppContent() {
       setActiveTabId(tabId)
       setActiveId(convId)
       setPage('chat')
-      // 更新对话的 tabId
-      setConversations(prev => prev.map(c => 
+      setConversations(prev => prev.map(c =>
         c.id === convId ? { ...c, tabId } : c
       ))
     }
-  }, [conversations])
+  }, [conversations, tabs])
 
   // 关闭标签
   const closeTab = useCallback((tabId: string) => {
@@ -113,19 +113,29 @@ function AppContent() {
     const tab = tabs.find(t => t.id === tabId)
     if (!tab || tab.isDefault) return
 
-    // 如果关闭的是当前激活的 tab，切换到默认标签
+    // 如果关闭的是当前激活的 tab，切换到相邻 tab（优先左侧）
     if (activeTabId === tabId) {
-      setActiveTabId('default')
-      setActiveId(null)
-      setPage('home')
+      const remaining = tabs.filter(t => t.id !== tabId)
+      const idx = tabs.findIndex(t => t.id === tabId)
+      const next = remaining[Math.max(0, idx - 1)] ?? remaining[0]
+      if (next) {
+        if (next.conversationId) {
+          setActiveId(next.conversationId)
+          setPage('chat')
+        } else {
+          setActiveId(null)
+          setPage('home')
+        }
+        setActiveTabId(next.id)
+      }
     }
 
-    // 删除 tab
+    // 删除 tab，保留对话记录（清除 tabId 引用使其可从侧边栏重新打开）
     setTabs(prev => prev.filter(t => t.id !== tabId))
-
-    // 删除关联的对话
     if (tab.conversationId) {
-      setConversations(prev => prev.filter(c => c.id !== tab.conversationId))
+      setConversations(prev => prev.map(c =>
+        c.id === tab.conversationId ? { ...c, tabId: undefined } : c
+      ))
     }
   }, [tabs, activeTabId])
 
@@ -145,12 +155,12 @@ function AppContent() {
     }
   }, [tabs])
 
-  // 创建新标签（首页）
+  // 创建新标签（首页）— 用于顶栏 + 按钮，始终新建
   const createNewTab = useCallback(() => {
     const tabId = `tab-${Date.now()}`
     const newTab: Tab = {
       id: tabId,
-      title: appConfig.appName, // 使用应用名称作为默认标题
+      title: appConfig.appName,
       isDefault: false,
     }
     setTabs(prev => [...prev, newTab])
@@ -158,6 +168,18 @@ function AppContent() {
     setActiveId(null)
     setPage('home')
   }, [])
+
+  // 侧边栏「新建任务」— 有空白 tab 则跳转，否则新建
+  const handleSidebarNewTask = useCallback(() => {
+    const emptyTab = tabs.find(t => !t.conversationId)
+    if (emptyTab) {
+      setActiveTabId(emptyTab.id)
+      setActiveId(null)
+      setPage('home')
+    } else {
+      createNewTab()
+    }
+  }, [tabs, createNewTab])
 
   // 只有当用户输入了内容时才创建新任务
   const startNewTask = useCallback((initialPrompt?: string) => {
@@ -252,7 +274,7 @@ function AppContent() {
           settings={settings}
           onHome={goHome}
           onSelect={selectConversation}
-          onNewTask={createNewTab} // 点击新建任务按钮创建新标签
+          onNewTask={handleSidebarNewTask}
           onDelete={deleteConv}
           onSettings={() => setShowSettings(true)}
           onSearch={() => setShowSearch(true)}
