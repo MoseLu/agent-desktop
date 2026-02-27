@@ -32,7 +32,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '8px 14px 10px',
+    padding: '8px 16px 10px',
     gap: 12,
   },
   toolbarLeft: {
