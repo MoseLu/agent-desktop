@@ -1,23 +1,23 @@
 import type { CSSProperties } from 'react'
 
 export const styles: Record<string, CSSProperties> = {
-  // Layout
+  // Layout — 宽度由外层响应式 wrapper 控制（Sidebar.tsx）
   sidebar: {
-    width: 240,
+    width: '100%',
+    height: '100%',
     background: 'var(--sidebar-bg)',
     borderRight: '1px solid var(--sidebar-border)',
     display: 'flex',
     flexDirection: 'column',
-    flexShrink: 0,
     padding: 0,
   },
   collapsedSidebar: {
-    width: 64,
+    width: '100%',
+    height: '100%',
     background: 'var(--bg-primary)',
     borderRight: '1px solid var(--sidebar-border)',
     display: 'flex',
     flexDirection: 'column',
-    flexShrink: 0,
     padding: 0,
   },
 
