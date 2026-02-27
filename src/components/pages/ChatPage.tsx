@@ -5,6 +5,8 @@ import Tooltip from '@ui/Tooltip'
 import ChatInput from '@ui/ChatInput'
 import ChatInputToolbar from '@ui/ChatInputToolbar'
 import ToolbarDropdownMenu from '@ui/ToolbarDropdownMenu'
+import SplitPane from '@ui/SplitPane'
+import PreviewPanel from '@ui/PreviewPanel'
 import {
   AttachIcon,
   FolderIcon,
@@ -12,7 +14,7 @@ import {
   GearIcon,
   OmnipotentModeIcon as OmnipotentIcon,
 } from '@ui/icons'
-import { ArrowUpOutlined } from '@ant-design/icons'
+import { ArrowUpOutlined, SplitCellsOutlined } from '@ant-design/icons'
 import { isElectron, callElectron } from '@utils/env'
 
 interface Props {
@@ -26,6 +28,7 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [isSmartMode, setIsSmartMode] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
 
@@ -146,8 +149,8 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
 
   const workspaceName = settings.workspace || '未设置工作目录'
 
-  return (
-    <div style={styles.page}>
+  const chatColumn = (
+    <div style={styles.chatColumn}>
       <div style={styles.messages}>
         {messages.map((msg, i) => (
           <MessageBubble key={i} message={msg} />
@@ -205,6 +208,19 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
                       </>
                     )}
                   </div>
+                  {/* Preview panel toggle */}
+                  <Tooltip title={showPreview ? '隐藏预览' : '显示预览'} position="top">
+                    <button
+                      onClick={() => setShowPreview(p => !p)}
+                      style={{
+                        ...styles.previewToggleBtn,
+                        ...(showPreview ? styles.previewToggleBtnActive : {}),
+                      }}
+                    >
+                      <SplitCellsOutlined style={{ fontSize: 15 }} />
+                    </button>
+                  </Tooltip>
+                  <div style={styles.divider} />
                   <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
                     <button
                       onClick={() => sendMessage()}
@@ -223,6 +239,28 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
           )}
         />
       </div>
+    </div>
+  )
+
+  return (
+    <div style={styles.page}>
+      {showPreview ? (
+        <SplitPane
+          left={chatColumn}
+          right={(
+            <PreviewPanel
+              messages={messages}
+              workspace={settings.workspace || ''}
+              onClose={() => setShowPreview(false)}
+            />
+          )}
+          defaultLeftPercent={62}
+          minLeft={320}
+          minRight={280}
+        />
+      ) : (
+        chatColumn
+      )}
     </div>
   )
 }
@@ -348,6 +386,7 @@ function MiniChevron({ open }: { open: boolean }) {
 
 const styles: Record<string, React.CSSProperties> = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden' },
+  chatColumn: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)' },
   messages: { flex: 1, overflowY: 'auto', padding: '24px 0' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
@@ -426,6 +465,26 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-secondary)', 
     fontWeight: 500,
     paddingRight: 4,
+  },
+  previewToggleBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    border: '1px solid var(--border-medium)',
+    background: 'transparent',
+    cursor: 'pointer',
+    color: 'var(--text-tertiary)',
+    transition: 'all 0.15s',
+    padding: 0,
+    flexShrink: 0,
+  },
+  previewToggleBtnActive: {
+    background: 'var(--active-bg)',
+    color: 'var(--text-primary)',
+    borderColor: 'var(--border-dark)',
   },
   sendBtn: {
     display: 'flex',
