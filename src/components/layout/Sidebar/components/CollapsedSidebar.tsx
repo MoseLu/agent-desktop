@@ -52,6 +52,7 @@ export function CollapsedSidebar({
         <UserMenu
           settings={props.settings}
           onSettings={props.onSettings}
+          onScheduledTasks={props.onScheduledTasks}
           isOpen={userMenuOpen}
           onOpenChange={onToggleUserMenu}
           collapsed

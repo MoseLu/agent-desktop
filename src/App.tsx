@@ -5,6 +5,7 @@ import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
 import HomePage from '@pages/HomePage'
 import ChatPage from '@pages/ChatPage'
+import ScheduledTasksPage from '@pages/ScheduledTasksPage'
 import SettingsModal from '@modals/SettingsModal'
 import SearchModal from '@modals/SearchModal'
 import { TabBar } from '@components/TabBar'
@@ -17,7 +18,7 @@ function AppContent() {
   const [showSearch, setShowSearch] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [page, setPage] = useState<'home' | 'chat'>('home')
+  const [page, setPage] = useState<'home' | 'chat' | 'scheduled-tasks'>('home')
   const { setTheme } = useTheme()
 
   // 标签栏状态
@@ -278,10 +279,20 @@ function AppContent() {
           onDelete={deleteConv}
           onSettings={() => setShowSettings(true)}
           onSearch={() => setShowSearch(true)}
+          onScheduledTasks={() => { setPage('scheduled-tasks'); setActiveId(null) }}
         />
 
         <main style={styles.main}>
-          {page === 'home' || !activeConv ? (
+          {page === 'scheduled-tasks' ? (
+            <ScheduledTasksPage onBack={goHome} />
+          ) : page === 'chat' && activeConv ? (
+            <ChatPage
+              key={activeId!}
+              conversation={activeConv}
+              settings={settings}
+              onUpdate={(updater) => updateConv(activeId!, updater)}
+            />
+          ) : (
             <HomePage
               settings={settings}
               onStartTask={(prompt) => {
@@ -290,13 +301,6 @@ function AppContent() {
                   // 任务已创建并切换到聊天页面
                 }
               }}
-            />
-          ) : (
-            <ChatPage
-              key={activeId!}
-              conversation={activeConv}
-              settings={settings}
-              onUpdate={(updater) => updateConv(activeId!, updater)}
             />
           )}
         </main>

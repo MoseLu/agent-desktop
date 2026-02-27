@@ -10,6 +10,7 @@ export interface SidebarProps {
   onDelete: (id: string) => void
   onSettings: () => void
   onSearch: () => void
+  onScheduledTasks: () => void
 }
 
 export interface SidebarWithMenuProps extends SidebarProps {
@@ -23,6 +24,7 @@ export interface SidebarWithMenuProps extends SidebarProps {
 export interface UserMenuProps {
   settings: Settings
   onSettings: () => void
+  onScheduledTasks: () => void
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   collapsed?: boolean

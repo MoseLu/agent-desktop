@@ -9,9 +9,10 @@ import {
   InfoIcon,
   LogoutIcon,
   ChevronIcon,
+  AlarmCheckIcon,
 } from '@ui'
 
-export function UserMenu({ settings, onSettings, isOpen, onOpenChange, collapsed = false }: UserMenuProps) {
+export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpenChange, collapsed = false }: UserMenuProps) {
   const displayName = settings.userName || '开发者'
   const displayPlan = settings.userPlan || '免费'
   
@@ -42,11 +43,16 @@ export function UserMenu({ settings, onSettings, isOpen, onOpenChange, collapsed
               <button style={styles.upgradeBtn}>升级</button>
             </div>
             
+            <div style={styles.menuItem} onClick={() => { onOpenChange(false); onScheduledTasks(); }}>
+              <AlarmCheckIcon size={16} />
+              <span>定时任务</span>
+            </div>
+
             <div style={styles.menuItem} onClick={() => { onOpenChange(false); onSettings(); }}>
               <SettingsIcon size={16} />
               <span>设置</span>
             </div>
-            
+
             <div style={styles.menuItem}>
               <ContactIcon size={16} />
               <span>联系我们</span>
@@ -117,11 +123,16 @@ export function UserMenu({ settings, onSettings, isOpen, onOpenChange, collapsed
             <button style={styles.upgradeBtn}>升级</button>
           </div>
           
+          <div style={styles.menuItem} onClick={() => { onOpenChange(false); onScheduledTasks(); }}>
+            <AlarmCheckIcon />
+            <span>定时任务</span>
+          </div>
+
           <div style={styles.menuItem} onClick={() => { onOpenChange(false); onSettings(); }}>
             <SettingsIcon />
             <span>设置</span>
           </div>
-          
+
           <div style={styles.menuItem}>
             <ContactIcon />
             <span>联系我们</span>
