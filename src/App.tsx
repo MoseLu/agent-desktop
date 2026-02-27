@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import type { Settings, Conversation, Message, Tab } from '@types'
 import { ThemeProvider, useTheme } from '@contexts/ThemeProvider'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
 import HomePage from '@pages/HomePage'
 import ChatPage from '@pages/ChatPage'
@@ -329,17 +329,85 @@ function AppContent() {
   )
 }
 
+// antd token 映射 — 与 CSS design token 同步，避免两套系统割裂
+const ANTD_LIGHT_TOKENS = {
+  colorPrimary: '#1a1a1a',
+  colorBgBase: '#ffffff',
+  colorTextBase: '#1a1a1a',
+  colorBorder: '#e8e8e8',
+  colorBorderSecondary: '#efefef',
+  colorError: '#f44336',
+  colorSuccess: '#4caf50',
+  colorWarning: '#ff9800',
+  colorInfo: '#42a5f5',
+  colorBgContainer: '#ffffff',
+  colorBgElevated: '#ffffff',
+  colorBgLayout: '#fafafa',
+  colorText: '#1a1a1a',
+  colorTextSecondary: '#666666',
+  colorTextTertiary: '#999999',
+  colorTextQuaternary: '#cccccc',
+  colorFill: 'rgba(0,0,0,0.06)',
+  colorFillSecondary: 'rgba(0,0,0,0.04)',
+  borderRadius: 8,
+  borderRadiusSM: 4,
+  borderRadiusLG: 12,
+  controlHeight: 32,
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif",
+  fontSize: 14,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  boxShadowSecondary: '0 4px 12px rgba(0,0,0,0.1)',
+  motionDurationMid: '0.15s',
+  motionDurationSlow: '0.2s',
+}
+
+const ANTD_DARK_TOKENS = {
+  colorPrimary: '#ffffff',
+  colorBgBase: '#1c1c1c',
+  colorTextBase: '#e5e5e5',
+  colorBorder: '#404040',
+  colorBorderSecondary: '#333333',
+  colorError: '#ef5350',
+  colorSuccess: '#66bb6a',
+  colorWarning: '#ffa726',
+  colorInfo: '#42a5f5',
+  colorBgContainer: '#262626',
+  colorBgElevated: '#262626',
+  colorBgLayout: '#171717',
+  colorText: '#e5e5e5',
+  colorTextSecondary: '#cccccc',
+  colorTextTertiary: '#a0a0a0',
+  colorTextQuaternary: '#707070',
+  colorFill: 'rgba(255,255,255,0.08)',
+  colorFillSecondary: 'rgba(255,255,255,0.04)',
+  borderRadius: 8,
+  borderRadiusSM: 4,
+  borderRadiusLG: 12,
+  controlHeight: 32,
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif",
+  fontSize: 14,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+  boxShadowSecondary: '0 4px 12px rgba(0,0,0,0.4)',
+  motionDurationMid: '0.15s',
+  motionDurationSlow: '0.2s',
+}
+
 function AppWithAntd() {
-  // antd 主题配置（适配当前设计令牌）
-  const antdTheme = {
-    token: {
-      borderRadius: 6,
-      controlHeight: 32,
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+
+  const themeConfig = {
+    algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+    token: isDark ? ANTD_DARK_TOKENS : ANTD_LIGHT_TOKENS,
+    components: {
+      Dropdown: {
+        paddingBlock: 5,
+      },
     },
   }
 
   return (
-    <ConfigProvider theme={antdTheme}>
+    <ConfigProvider theme={themeConfig}>
       <AppContent />
     </ConfigProvider>
   )
