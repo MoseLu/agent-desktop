@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import type { TaskListProps, TaskItemProps } from '../Sidebar.types'
 import { styles } from '../Sidebar.styles'
 import { TaskIcon, ChevronIcon } from '@ui'
-import { EllipsisOutlined } from '@ant-design/icons'
+import { EllipsisOutlined, ShareAltOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps, message } from 'antd'
 
 interface TaskItemWithMenuProps extends TaskItemProps {
@@ -26,7 +26,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
     }
   }, [editing])
 
-  const handleCopyId = () => {
+  const handleShare = () => {
     onCopyId(conversation.id)
   }
 
@@ -64,12 +64,14 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
   // Dropdown 菜单项
   const menuItems: MenuProps['items'] = [
     {
-      key: 'copy',
-      label: '复制对话 ID',
-      onClick: handleCopyId,
+      key: 'share',
+      icon: <ShareAltOutlined />,
+      label: '分享',
+      onClick: handleShare,
     },
     {
       key: 'rename',
+      icon: <EditOutlined />,
       label: '重命名',
       onClick: handleRename,
     },
@@ -78,6 +80,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
     },
     {
       key: 'delete',
+      icon: <DeleteOutlined style={{ color: 'var(--error)' }} />,
       label: <span style={{ color: 'var(--error)' }}>删除</span>,
       onClick: handleDelete,
     },
@@ -188,7 +191,7 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
   const handleCopyId = async (id: string) => {
     try {
       await navigator.clipboard.writeText(id)
-      message.success('已复制对话 ID')
+      message.success('已复制分享链接')
     } catch (err) {
       console.error('复制失败:', err)
       message.error('复制失败')
