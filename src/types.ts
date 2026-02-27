@@ -68,6 +68,7 @@ declare global {
       onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void
       fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>
       openInExplorer: (p: string) => void
+      openExternal: (url: string) => Promise<void>
       setAutoLaunch: (enabled: boolean) => Promise<{ ok: boolean }>
       getAutoLaunch: () => Promise<{ openAtLogin: boolean }>
     }

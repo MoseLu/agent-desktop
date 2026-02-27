@@ -186,3 +186,5 @@ ipcMain.handle('fs-list', async (_, dirPath) => {
 })
 
 ipcMain.handle('open-in-explorer', (_, p) => shell.showItemInFolder(p))
+
+ipcMain.handle('open-external', (_, url) => shell.openExternal(url))

@@ -33,6 +33,18 @@
 </head>
 <body>
   <div id="root"></div>
+  <!-- 在 React 加载前立即应用存储的主题，消除首屏闪白 -->
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('app-theme');
+        var resolved = t === 'dark' ? 'dark'
+          : t === 'light' ? 'light'
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', resolved);
+      } catch(e) {}
+    })();
+  </script>
   <script type="module" src="/main.tsx"></script>
 </body>
 </html>

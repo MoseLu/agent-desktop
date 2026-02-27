@@ -288,37 +288,68 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
 
       case 'notifications':
         return (
-          <div style={styles.tabContent}>
-            
-            <Field label="桌面通知">
-              <div style={styles.horizontalField}>
-                <span style={styles.fieldDesc}>允许应用发送通知</span>
+          <div style={{ ...styles.tabContent, maxWidth: '100%' }}>
+            {/* Permission card */}
+            <div style={styles.notifyCard}>
+              <div style={styles.notifyCardLeft}>
+                <div style={styles.notifyCardIcon}>
+                  <BellIcon />
+                </div>
+                <div>
+                  <div style={styles.notifyCardTitle}>通知权限</div>
+                  <div style={styles.notifyCardDesc}>
+                    {form.desktopNotifications
+                      ? '已允许应用发送桌面通知'
+                      : '通知已关闭，开启后可接收任务提醒'}
+                  </div>
+                </div>
+              </div>
+              <button
+                style={styles.manageBtn}
+                onClick={() => {
+                  if (isElectron()) {
+                    window.electron.openExternal('ms-settings:notifications')
+                  }
+                }}
+              >
+                管理
+              </button>
+            </div>
+
+            {/* Notification rows */}
+            <DesktopRow
+              label="桌面通知"
+              desc="允许应用发送系统通知"
+              control={
                 <label className="switch">
                   <input type="checkbox" checked={form.desktopNotifications ?? true} onChange={e => set('desktopNotifications', e.target.checked)} />
                   <span className="slider"></span>
                 </label>
-              </div>
-            </Field>
+              }
+            />
 
-            <Field label="任务完成提醒">
-              <div style={styles.horizontalField}>
-                <span style={styles.fieldDesc}>任务完成时显示通知</span>
+            <DesktopRow
+              label="任务完成提醒"
+              desc="任务完成或出错时显示通知"
+              control={
                 <label className="switch">
                   <input type="checkbox" checked={form.taskCompleteNotify ?? true} onChange={e => set('taskCompleteNotify', e.target.checked)} />
                   <span className="slider"></span>
                 </label>
-              </div>
-            </Field>
+              }
+            />
 
-            <Field label="声音提醒">
-              <div style={styles.horizontalField}>
-                <span style={styles.fieldDesc}>播放提示音</span>
+            <DesktopRow
+              label="声音提醒"
+              desc="收到通知时播放提示音"
+              control={
                 <label className="switch">
                   <input type="checkbox" checked={form.soundNotify ?? false} onChange={e => set('soundNotify', e.target.checked)} />
                   <span className="slider"></span>
                 </label>
-              </div>
-            </Field>
+              }
+              last
+            />
           </div>
         )
 
@@ -546,7 +577,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column',
   },
   sidebarHeader: {
-    padding: '20px 24px', borderBottom: '1px solid var(--border-light)',
+    padding: '20px 24px',
   },
   sidebarTitle: {
     fontSize: 14, fontWeight: 400, color: 'var(--text-primary)',
@@ -822,6 +853,33 @@ const styles: Record<string, React.CSSProperties> = {
   },
   fieldDesc: {
     fontSize: 13.5, color: 'var(--text-secondary)',
+  },
+  notifyCard: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '16px 18px', marginBottom: 20,
+    background: 'var(--bg-secondary)', border: '1px solid var(--border-light)',
+    borderRadius: 12,
+  },
+  notifyCardLeft: {
+    display: 'flex', alignItems: 'center', gap: 14,
+  },
+  notifyCardIcon: {
+    width: 40, height: 40, borderRadius: 10,
+    background: 'var(--bg-primary)', border: '1px solid var(--border-light)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--text-secondary)', flexShrink: 0,
+  },
+  notifyCardTitle: {
+    fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2,
+  },
+  notifyCardDesc: {
+    fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.4,
+  },
+  manageBtn: {
+    border: '1px solid var(--border-medium)', background: 'var(--bg-primary)',
+    borderRadius: 8, padding: '6px 16px', fontSize: 13,
+    color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit',
+    flexShrink: 0,
   },
   migrateBtn: {
     border: 'none',

@@ -25,14 +25,29 @@ function getResolvedTheme(theme: Theme): 'light' | 'dark' {
   return theme
 }
 
-// 应用主题到 DOM
+// 应用主题到 DOM（无闪烁：先禁用过渡，切换属性，再下一帧恢复）
 function applyTheme(resolvedTheme: 'light' | 'dark') {
   if (typeof document === 'undefined') return
-  
+
   const root = document.documentElement
-  
-  // 明确设置主题属性，而不是移除
+  root.setAttribute('data-no-transition', '')
   root.setAttribute('data-theme', resolvedTheme)
+
+  // 两帧后恢复过渡，确保浏览器已完成绘制
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      root.removeAttribute('data-no-transition')
+    })
+  })
+}
+
+// 从 localStorage 读取上次主题，用于首屏即刻应用（防止初始闪烁）
+function getStoredTheme(): Theme | null {
+  try {
+    const v = localStorage.getItem('app-theme')
+    if (v === 'light' || v === 'dark' || v === 'system') return v
+  } catch { /* ignore */ }
+  return null
 }
 
 interface ThemeProviderProps {
@@ -41,20 +56,26 @@ interface ThemeProviderProps {
   onThemeChange?: (theme: Theme) => void
 }
 
-export function ThemeProvider({ 
-  children, 
+export function ThemeProvider({
+  children,
   defaultTheme = 'system',
-  onThemeChange 
+  onThemeChange
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(defaultTheme)
+  // 优先使用 localStorage 缓存的主题，避免异步加载设置时的初始闪烁
+  const initialTheme = getStoredTheme() ?? defaultTheme
+  const [theme, setThemeState] = useState<Theme>(initialTheme)
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(
-    getResolvedTheme(defaultTheme)
+    getResolvedTheme(initialTheme)
   )
 
-  // 设置主题：只更新状态，由 useLayoutEffect 统一应用到 DOM
+  // 设置主题：先同步更新 DOM（消除切换闪烁），再更新 React 状态
   const setTheme = useCallback((newTheme: Theme) => {
-    setThemeState(newTheme)
     const resolved = getResolvedTheme(newTheme)
+    // 立即同步应用到 DOM，在 React 重新渲染前完成，彻底消除闪烁
+    applyTheme(resolved)
+    // 同步到 localStorage 供下次启动时即刻读取
+    try { localStorage.setItem('app-theme', newTheme) } catch { /* ignore */ }
+    setThemeState(newTheme)
     setResolvedTheme(resolved)
     onThemeChange?.(newTheme)
   }, [onThemeChange])

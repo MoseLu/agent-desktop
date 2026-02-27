@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electron', {
   },
   fsList: (d) => ipcRenderer.invoke('fs-list', d),
   openInExplorer: (p) => ipcRenderer.invoke('open-in-explorer', p),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   // Auto launch
   setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),

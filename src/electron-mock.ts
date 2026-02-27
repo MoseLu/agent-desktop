@@ -45,6 +45,7 @@ interface ElectronAPI {
   onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void;
   fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>;
   openInExplorer: (p: string) => void;
+  openExternal: (url: string) => Promise<void>;
 }
 
 // Define the mock implementation
@@ -148,6 +149,10 @@ const createMockElectron = (): ElectronAPI => {
     openInExplorer: (path: string) => {
       console.log(`[Mock] Would open explorer at: ${path}`);
       alert(`Would open file explorer at: ${path}`);
+    },
+
+    openExternal: async (url: string) => {
+      console.log(`[Mock] Would open external URL: ${url}`);
     }
   };
 };

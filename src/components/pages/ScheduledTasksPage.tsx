@@ -1,11 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { InfoIcon, AlarmCheckIcon } from '@ui'
+import NewScheduledTaskModal from '@modals/NewScheduledTaskModal'
 
 interface Props {
   onBack?: () => void
 }
 
 export default function ScheduledTasksPage({ onBack }: Props) {
+  const [showCreate, setShowCreate] = useState(false)
+
   return (
     <div style={styles.root}>
       {/* Header */}
@@ -38,11 +41,21 @@ export default function ScheduledTasksPage({ onBack }: Props) {
         </div>
         <div style={styles.emptyTitle}>开始添加定时任务</div>
         <div style={styles.emptyDesc}>安排未来任务，让MiniMax代理按时处理您的日常工作。</div>
-        <button style={styles.addBtn}>
+        <button style={styles.addBtn} onClick={() => setShowCreate(true)}>
           <span style={{ fontSize: 16, lineHeight: 1, marginRight: 4 }}>+</span>
           新建定时任务
         </button>
       </div>
+
+      {showCreate && (
+        <NewScheduledTaskModal
+          onClose={() => setShowCreate(false)}
+          onConfirm={(_data) => {
+            // TODO: persist task
+            setShowCreate(false)
+          }}
+        />
+      )}
     </div>
   )
 }

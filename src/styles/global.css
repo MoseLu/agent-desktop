@@ -21,7 +21,12 @@ body {
   line-height: var(--leading-normal);
   color: var(--text-primary);
   background-color: var(--bg-primary);
-  transition: background-color var(--transition-slower) ease, color var(--transition-slower) ease;
+}
+
+/* Suppress all transitions during theme switch to prevent flash */
+[data-no-transition], [data-no-transition] *, [data-no-transition] *::before, [data-no-transition] *::after {
+  transition: none !important;
+  animation-duration: 0.001ms !important;
 }
 
 /* 滚动条样式 */
