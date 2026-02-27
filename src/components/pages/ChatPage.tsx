@@ -4,6 +4,7 @@ import IconButton from '@ui/IconButton'
 import Tooltip from '@ui/Tooltip'
 import ChatInput from '@ui/ChatInput'
 import ChatInputToolbar from '@ui/ChatInputToolbar'
+import ToolbarDropdownMenu from '@ui/ToolbarDropdownMenu'
 import {
   AttachIcon,
   FolderIcon,
@@ -170,11 +171,14 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
           renderToolbar={() => (
             <ChatInputToolbar
               leftContent={(
-                <IconButton 
-                  variant="bordered" 
-                  icon={<AttachIcon />} 
-                  title="上传文件"
-                />
+                <>
+                  <IconButton
+                    variant="bordered"
+                    icon={<AttachIcon />}
+                    title="上传文件"
+                  />
+                  <ToolbarDropdownMenu />
+                </>
               )}
               rightContent={(
                 <>
