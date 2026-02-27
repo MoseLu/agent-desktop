@@ -224,7 +224,7 @@ export default function NewScheduledTaskModal({ onClose, onConfirm }: Props) {
       description: description.trim(),
       frequency,
       weekday: frequency === 'weekly' ? weekday : undefined,
-      scheduledTime: frequency === 'interval' ? undefined : confirmedTime,
+      scheduledTime: frequency === 'interval' ? undefined : confirmedTime ?? undefined,
       intervalValue: frequency === 'interval' ? Number((intervalUnit === 'hour' ? INTERVAL_HOURS : INTERVAL_MINUTES)[intervalValueIdx]) : undefined,
       intervalUnit: frequency === 'interval' ? intervalUnit : undefined,
     })

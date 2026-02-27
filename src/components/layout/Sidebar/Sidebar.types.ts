@@ -1,4 +1,4 @@
-import type { Conversation, Settings } from '../../types'
+import type { Conversation, Settings } from '../../../types'
 
 export interface SidebarProps {
   conversations: Conversation[]

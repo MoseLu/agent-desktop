@@ -205,7 +205,7 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
     <>
       <button style={styles.collapsibleHeader} onClick={onToggle}>
         <span>任务记录</span>
-        <ChevronIcon rotated={isOpen} />
+        <ChevronIcon style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
       </button>
 
       {isOpen && (

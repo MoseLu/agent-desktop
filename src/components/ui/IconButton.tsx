@@ -4,7 +4,7 @@ import type { ButtonProps } from 'antd'
 
 export type IconButtonVariant = 'bordered' | 'borderless'
 
-export interface IconButtonProps extends Omit<ButtonProps, 'icon' | 'type'> {
+export interface IconButtonProps extends Omit<ButtonProps, 'icon' | 'type' | 'variant'> {
   /** 图标按钮类型 */
   variant?: IconButtonVariant
   /** 图标元素 */
