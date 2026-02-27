@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import type { Settings } from '@types'
+import type { Settings, FolderPermission } from '@types'
 import { appConfig } from '@config'
 import { CameraOutlined } from '@ant-design/icons'
 import { isElectron } from '@utils/env'
@@ -26,6 +26,8 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
   const [shortcutInput, setShortcutInput] = useState(form.shortcut || 'Alt+A')
+  const [showCommandWhitelist, setShowCommandWhitelist] = useState(false)
+  const [showFolderPermissions, setShowFolderPermissions] = useState(false)
 
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -276,15 +278,15 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
             {/* 命令白名单 */}
             <DesktopRow
               label="命令白名单"
-              desc="允许自动运行的命令"
-              control={<button style={styles.editBtn}>编辑</button>}
+              desc={form.commandWhitelist?.length ? `${form.commandWhitelist.length} 条命令` : '允许自动运行的命令'}
+              control={<button style={styles.editBtn} onClick={() => setShowCommandWhitelist(true)}>编辑</button>}
             />
 
             {/* 文件夹访问权限 */}
             <DesktopRow
               label="文件夹访问权限"
-              desc="已授予读写权限的文件夹"
-              control={<button style={styles.editBtn}>编辑</button>}
+              desc={form.folderPermissions?.length ? `${form.folderPermissions.length} 个文件夹` : '已授予读写权限的文件夹'}
+              control={<button style={styles.editBtn} onClick={() => setShowFolderPermissions(true)}>编辑</button>}
             />
 
             {/* 语言 */}
@@ -490,6 +492,30 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
           </div>
         </div>
       </div>
+
+      {/* 二级弹窗：命令白名单 */}
+      {showCommandWhitelist && (
+        <CommandWhitelistModal
+          commands={form.commandWhitelist ?? []}
+          onSave={(commands) => {
+            set('commandWhitelist', commands)
+            setShowCommandWhitelist(false)
+          }}
+          onClose={() => setShowCommandWhitelist(false)}
+        />
+      )}
+
+      {/* 二级弹窗：文件夹访问权限 */}
+      {showFolderPermissions && (
+        <FolderPermissionsModal
+          folders={form.folderPermissions ?? []}
+          onSave={(folders) => {
+            set('folderPermissions', folders)
+            setShowFolderPermissions(false)
+          }}
+          onClose={() => setShowFolderPermissions(false)}
+        />
+      )}
     </div>
   )
 }
@@ -951,5 +977,384 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 32,
     fontWeight: 600,
     color: 'white',
+  },
+}
+
+// ─── 命令白名单弹窗 ────────────────────────────────────────────────────────────
+
+function CommandWhitelistModal({
+  commands,
+  onSave,
+  onClose,
+}: {
+  commands: string[]
+  onSave: (commands: string[]) => void
+  onClose: () => void
+}) {
+  const [list, setList] = useState<string[]>([...commands])
+  const [newCommand, setNewCommand] = useState('')
+
+  const addCommand = () => {
+    const trimmed = newCommand.trim()
+    if (!trimmed || list.includes(trimmed)) return
+    setList(prev => [...prev, trimmed])
+    setNewCommand('')
+  }
+
+  const removeCommand = (index: number) => {
+    setList(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') addCommand()
+  }
+
+  return (
+    <div
+      style={subModalStyles.backdrop}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={subModalStyles.panel}>
+        {/* 标题栏 */}
+        <div style={subModalStyles.header}>
+          <div>
+            <div style={subModalStyles.title}>命令白名单</div>
+            <div style={subModalStyles.subtitle}>允许以下命令自动运行，无需每次确认</div>
+          </div>
+          <button style={styles.closeBtn} onClick={onClose}>×</button>
+        </div>
+
+        {/* 命令列表 */}
+        <div style={subModalStyles.listArea}>
+          {list.length === 0 ? (
+            <div style={subModalStyles.empty}>暂无命令，请在下方添加</div>
+          ) : (
+            list.map((cmd, i) => (
+              <div key={i} style={subModalStyles.listItem}>
+                <span style={subModalStyles.cmdPrompt}>$</span>
+                <span style={subModalStyles.cmdText}>{cmd}</span>
+                <button
+                  style={subModalStyles.removeBtn}
+                  onClick={() => removeCommand(i)}
+                  title="删除"
+                >
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                    <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 添加输入框 */}
+        <div style={subModalStyles.addRow}>
+          <input
+            type="text"
+            value={newCommand}
+            onChange={e => setNewCommand(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="输入命令，例如：npm run dev"
+            style={subModalStyles.addInput}
+          />
+          <button
+            onClick={addCommand}
+            disabled={!newCommand.trim()}
+            style={{
+              ...subModalStyles.addBtn,
+              opacity: newCommand.trim() ? 1 : 0.45,
+              cursor: newCommand.trim() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            添加
+          </button>
+        </div>
+
+        {/* 底部操作 */}
+        <div style={subModalStyles.footer}>
+          <button style={styles.editBtn} onClick={onClose}>取消</button>
+          <button style={subModalStyles.confirmBtn} onClick={() => onSave(list)}>完成</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── 文件夹访问权限弹窗 ────────────────────────────────────────────────────────
+
+function FolderPermissionsModal({
+  folders,
+  onSave,
+  onClose,
+}: {
+  folders: FolderPermission[]
+  onSave: (folders: FolderPermission[]) => void
+  onClose: () => void
+}) {
+  const [list, setList] = useState<FolderPermission[]>([...folders])
+
+  const addFolder = async () => {
+    if (!isElectron()) {
+      message.warning('请在桌面版中使用此功能', 3000)
+      return
+    }
+    const folder = await window.electron.pickFolder()
+    if (folder && !list.find(f => f.path === folder)) {
+      setList(prev => [...prev, { path: folder, permission: 'read-write' }])
+    }
+  }
+
+  const removeFolder = (index: number) => {
+    setList(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updatePermission = (index: number, permission: FolderPermission['permission']) => {
+    setList(prev => prev.map((f, i) => i === index ? { ...f, permission } : f))
+  }
+
+  return (
+    <div
+      style={subModalStyles.backdrop}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ ...subModalStyles.panel, width: 520 }}>
+        {/* 标题栏 */}
+        <div style={subModalStyles.header}>
+          <div>
+            <div style={subModalStyles.title}>文件夹访问权限</div>
+            <div style={subModalStyles.subtitle}>为 Agent 授予对特定文件夹的读写权限</div>
+          </div>
+          <button style={styles.closeBtn} onClick={onClose}>×</button>
+        </div>
+
+        {/* 文件夹列表 */}
+        <div style={subModalStyles.listArea}>
+          {list.length === 0 ? (
+            <div style={subModalStyles.empty}>暂无授权文件夹，点击下方按钮添加</div>
+          ) : (
+            list.map((item, i) => (
+              <div key={i} style={subModalStyles.listItem}>
+                {/* 文件夹图标 */}
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{ color: '#ffa940', flexShrink: 0 }}>
+                  <path d="M2 6a2 2 0 012-2h3.586a1 1 0 01.707.293l1.414 1.414A1 1 0 0010.414 6H16a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" fill="currentColor"/>
+                </svg>
+                {/* 路径 */}
+                <span style={subModalStyles.folderPath}>{item.path}</span>
+                {/* 权限选择 */}
+                <select
+                  value={item.permission}
+                  onChange={e => updatePermission(i, e.target.value as FolderPermission['permission'])}
+                  style={subModalStyles.permSelect}
+                >
+                  <option value="read">只读</option>
+                  <option value="write">只写</option>
+                  <option value="read-write">读写</option>
+                </select>
+                {/* 删除按钮 */}
+                <button
+                  style={subModalStyles.removeBtn}
+                  onClick={() => removeFolder(i)}
+                  title="移除"
+                >
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                    <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 添加文件夹按钮 */}
+        <div style={{ padding: '0 24px 16px' }}>
+          <button onClick={addFolder} style={subModalStyles.addFolderBtn}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            添加文件夹
+          </button>
+        </div>
+
+        {/* 底部操作 */}
+        <div style={subModalStyles.footer}>
+          <button style={styles.editBtn} onClick={onClose}>取消</button>
+          <button style={subModalStyles.confirmBtn} onClick={() => onSave(list)}>完成</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── 二级弹窗共用样式 ──────────────────────────────────────────────────────────
+
+const subModalStyles: Record<string, React.CSSProperties> = {
+  backdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0, 0, 0, 0.55)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1100,
+    backdropFilter: 'blur(1px)',
+  },
+  panel: {
+    width: 480,
+    background: 'var(--modal-bg)',
+    borderRadius: 12,
+    boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px var(--border-dark)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    padding: '20px 24px 16px',
+    borderBottom: '1px solid var(--border-light)',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    marginBottom: 3,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
+    lineHeight: 1.4,
+  },
+  listArea: {
+    padding: '12px 24px',
+    maxHeight: 300,
+    overflowY: 'auto',
+    minHeight: 80,
+  },
+  empty: {
+    textAlign: 'center',
+    padding: '32px 0',
+    color: 'var(--text-tertiary)',
+    fontSize: 13,
+  },
+  listItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '9px 12px',
+    marginBottom: 6,
+    background: 'var(--bg-secondary)',
+    borderRadius: 8,
+    border: '1px solid var(--border-light)',
+  },
+  cmdPrompt: {
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
+    fontFamily: 'monospace',
+    flexShrink: 0,
+  },
+  cmdText: {
+    flex: 1,
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    fontFamily: 'monospace',
+    wordBreak: 'break-all' as const,
+    minWidth: 0,
+  },
+  folderPath: {
+    flex: 1,
+    fontSize: 12.5,
+    color: 'var(--text-primary)',
+    fontFamily: 'monospace',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    minWidth: 0,
+  },
+  removeBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--text-tertiary)',
+    padding: '4px',
+    borderRadius: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'color 0.15s',
+  },
+  permSelect: {
+    border: '1px solid var(--border-medium)',
+    borderRadius: 6,
+    padding: '3px 6px',
+    fontSize: 12,
+    color: 'var(--text-secondary)',
+    background: 'var(--bg-primary)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    flexShrink: 0,
+    outline: 'none',
+  },
+  addRow: {
+    padding: '4px 24px 16px',
+    display: 'flex',
+    gap: 8,
+  },
+  addInput: {
+    flex: 1,
+    border: '1px solid var(--border-medium)',
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    background: 'var(--bg-primary)',
+    outline: 'none',
+    fontFamily: 'monospace',
+  },
+  addBtn: {
+    border: 'none',
+    background: '#0094fc',
+    borderRadius: 8,
+    padding: '8px 16px',
+    fontSize: 13,
+    color: 'white',
+    fontFamily: 'inherit',
+    fontWeight: 500,
+    flexShrink: 0,
+  },
+  addFolderBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: '100%',
+    border: '1px dashed var(--border-medium)',
+    background: 'transparent',
+    borderRadius: 8,
+    padding: '9px 16px',
+    fontSize: 13,
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.15s, color 0.15s',
+  },
+  footer: {
+    padding: '14px 24px',
+    borderTop: '1px solid var(--border-light)',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  confirmBtn: {
+    border: 'none',
+    background: '#0094fc',
+    borderRadius: 8,
+    padding: '8px 22px',
+    fontSize: 13,
+    color: 'white',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontWeight: 500,
   },
 }

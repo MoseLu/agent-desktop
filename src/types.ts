@@ -1,3 +1,8 @@
+export interface FolderPermission {
+  path: string
+  permission: 'read' | 'write' | 'read-write'
+}
+
 export interface Settings {
   apiKey: string
   workspace: string
@@ -17,6 +22,8 @@ export interface Settings {
   autoStart?: boolean
   shortcut?: string
   minimaxWorkspace?: string
+  commandWhitelist?: string[]
+  folderPermissions?: FolderPermission[]
 }
 
 export interface ToolEvent {
