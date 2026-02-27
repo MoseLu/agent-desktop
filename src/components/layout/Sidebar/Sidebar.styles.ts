@@ -142,7 +142,7 @@ export const styles: Record<string, CSSProperties> = {
     background: 'var(--hover-bg)',
   },
   taskTitle: {
-    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     fontSize: 12.5,
   },
   taskTitleRunning: {
@@ -374,21 +374,6 @@ if (typeof document !== 'undefined') {
       100% {
         background-position: 200% 0;
       }
-    }
-    
-    /* Task menu dropdown styles */
-    .ant-dropdown-menu-item {
-      padding: 6px 12px !important;
-      font-size: 12.5px !important;
-      color: var(--text-primary) !important;
-      transition: background 0.15s !important;
-    }
-    .ant-dropdown-menu-item:hover {
-      background: var(--hover-bg) !important;
-    }
-    .ant-dropdown-menu-item-divider {
-      background: var(--border-light) !important;
-      margin: 4px 0 !important;
     }
   `
   const existing = document.getElementById('sidebar-animation')

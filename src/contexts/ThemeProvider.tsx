@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useLayoutEffect, useState, useCallback } from 'react'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -51,12 +51,11 @@ export function ThemeProvider({
     getResolvedTheme(defaultTheme)
   )
 
-  // 设置主题并应用
+  // 设置主题：只更新状态，由 useLayoutEffect 统一应用到 DOM
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme)
     const resolved = getResolvedTheme(newTheme)
     setResolvedTheme(resolved)
-    applyTheme(resolved)
     onThemeChange?.(newTheme)
   }, [onThemeChange])
 
@@ -78,7 +77,7 @@ export function ThemeProvider({
       if (theme === 'system') {
         const resolved = getSystemTheme()
         setResolvedTheme(resolved)
-        applyTheme(resolved)
+        // applyTheme 由 useLayoutEffect 统一处理
       }
     }
 
@@ -86,10 +85,11 @@ export function ThemeProvider({
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme])
 
-  // 初始应用主题
-  useEffect(() => {
+  // 将主题同步应用到 DOM：useLayoutEffect 在 React 渲染（含 antd ConfigProvider 更新）完成后、
+  // 浏览器绘制前同步执行，确保 CSS 变量切换与 antd 算法切换在同一帧内完成，消除闪烁
+  useLayoutEffect(() => {
     applyTheme(resolvedTheme)
-  }, [])
+  }, [resolvedTheme])
 
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>

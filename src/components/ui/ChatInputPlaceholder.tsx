@@ -39,9 +39,9 @@ export default function ChatInputPlaceholder({
 const styles: Record<string, React.CSSProperties> = {
   placeholderWrapper: {
     position: 'absolute',
-    top: 24,   // inputContent padding(8) + textarea padding(16) = 24
-    left: 24,  // inputContent padding(8) + textarea padding(16) = 24
-    right: 24, // inputContent padding(8) + textarea padding(16) = 24
+    top: 16,   // textarea padding-top: 16px (inputContent padding:0，gap≠padding)
+    left: 16,  // textarea padding-left: 16px
+    right: 16, // textarea padding-right: 16px
     pointerEvents: 'none',
     zIndex: 1,
     overflow: 'hidden',
