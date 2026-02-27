@@ -1,0 +1,37 @@
+/* ==========================================================================
+   Level 3: Component Tokens - 组件特定令牌
+   这些令牌在两种主题中都适用（引用 Level 2 的值）
+   ========================================================================== */
+
+/* 用户菜单 */
+:root {
+  --user-menu-bg: var(--bg-primary);
+  --user-menu-border: var(--border-dark);
+  --user-menu-shadow: var(--shadow-lg);
+  
+  /* 输入框组件 */
+  --input-component-bg: var(--input-bg);
+  --input-component-border: var(--input-border);
+  --input-component-border-focused: var(--input-border-focused);
+  
+  /* 模态框 */
+  --modal-backdrop: var(--bg-overlay);
+  --modal-bg: var(--bg-modal);
+  --modal-shadow: var(--shadow-xl);
+}
+
+/* 工具提示 - 浅色主题 */
+[data-theme='light'] {
+  --tooltip-bg: var(--bg-secondary);
+  --tooltip-border: var(--border-medium);
+  --tooltip-text: var(--text-primary);
+  --tooltip-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 工具提示 - 深色主题 */
+[data-theme='dark'] {
+  --tooltip-bg: var(--bg-tertiary);
+  --tooltip-border: var(--border-dark);
+  --tooltip-text: var(--text-primary);
+  --tooltip-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}

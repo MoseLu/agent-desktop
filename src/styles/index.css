@@ -1,0 +1,18 @@
+/* ==========================================================================
+   Styles Entry Point - 样式系统入口
+   ========================================================================== */
+
+/* Level 1: Global Tokens */
+@import './design-tokens/base.css';
+@import './design-tokens/colors-light.css';
+@import './design-tokens/colors-dark.css';
+
+/* Level 2: Alias Tokens */
+@import './design-tokens/alias-light.css';
+@import './design-tokens/alias-dark.css';
+
+/* Level 3: Component Tokens */
+@import './design-tokens/components.css';
+
+/* Global Styles */
+@import './global.css';

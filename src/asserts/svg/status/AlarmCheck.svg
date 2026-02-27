@@ -1,0 +1,16 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 闹钟主体 -->
+  <circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="1.8"/>
+  <!-- 闹钟顶部按钮 -->
+  <line x1="12" y1="6" x2="12" y2="3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 闹钟左上支脚 -->
+  <line x1="7" y1="8" x2="5" y2="5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 闹钟右上支脚 -->
+  <line x1="17" y1="8" x2="19" y2="5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 闹钟左下支脚 -->
+  <line x1="8" y1="18" x2="6" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 闹钟右下支脚 -->
+  <line x1="16" y1="18" x2="18" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 对勾 -->
+  <path d="M10 13L11.5 14.5L14.5 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

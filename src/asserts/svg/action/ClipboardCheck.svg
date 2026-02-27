@@ -1,0 +1,14 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 剪贴板主体 -->
+  <rect x="5" y="4" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
+  <!-- 剪贴板顶部夹子 -->
+  <rect x="9" y="2" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.8"/>
+  <!-- 清单行 1 -->
+  <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- 清单行 2 -->
+  <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- 清单行 3 -->
+  <line x1="8" y1="15" x2="13" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- 对勾 -->
+  <path d="M15.5 17.5L17 19L20 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

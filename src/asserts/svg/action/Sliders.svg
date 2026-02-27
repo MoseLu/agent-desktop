@@ -1,0 +1,12 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 上滑块轨道 -->
+  <line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 上滑块 -->
+  <circle cx="8" cy="6" r="3" fill="currentColor"/>
+  <circle cx="8" cy="6" r="1" fill="white"/>
+  <!-- 下滑块轨道 -->
+  <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 下滑块 -->
+  <circle cx="16" cy="18" r="3" fill="currentColor"/>
+  <circle cx="16" cy="18" r="1" fill="white"/>
+</svg>

@@ -1,0 +1,81 @@
+/* ==========================================================================
+   Level 2: Alias Tokens - 语义化令牌（深色模式）
+   Theme: Dark
+   ========================================================================== */
+
+[data-theme='dark'] {
+  /* 背景色 */
+  --bg-primary: var(--color-gray-200);
+  --bg-secondary: var(--color-gray-200);
+  --bg-tertiary: var(--color-gray-200);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --bg-modal: var(--color-gray-100);
+  
+  /* 边框和分隔线 */
+  --border-light: var(--color-gray-300);
+  --border-medium: var(--color-gray-400);
+  --border-dark: var(--color-gray-500);
+  --border-focused: var(--color-gray-600);
+  
+  /* 文字颜色 */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-800);
+  --text-tertiary: var(--color-gray-700);
+  --text-disabled: var(--color-gray-600);
+  --text-inverse: var(--color-gray-950);
+  --text-error: var(--color-red-500);
+  
+  /* 强调色 */
+  --accent-primary: var(--color-white);
+  --accent-secondary: var(--color-blue-500);
+  --accent-gradient: linear-gradient(135deg, var(--color-blue-500), var(--color-purple-500));
+  
+  /* 功能色 */
+  --success: var(--color-green-500);
+  --warning: var(--color-orange-500);
+  --error: var(--color-red-500);
+  --error-strong: var(--color-red-600);
+  --info: var(--color-blue-400);
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, var(--shadow-opacity-sm));
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, var(--shadow-opacity-md));
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, var(--shadow-opacity-lg));
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, var(--shadow-opacity-xl));
+  
+  /* 输入框 */
+  --input-bg: var(--color-gray-100);
+  --input-border: var(--border-medium);
+  --input-border-focused: var(--color-gray-600);
+  --input-placeholder: var(--color-gray-600);
+  
+  /* 按钮 */
+  --button-primary-bg: var(--color-white);
+  --button-primary-text: var(--color-gray-950);
+  --button-secondary-bg: var(--color-gray-50);
+  --button-secondary-text: var(--color-gray-900);
+  --button-secondary-border: var(--border-medium);
+  --button-danger-bg: var(--color-red-500);
+  --button-danger-text: var(--color-white);
+  
+  /* 选中状态 */
+  --selected-bg: var(--color-gray-300);
+  --hover-bg: var(--color-gray-400);
+  --active-bg: #353535;
+  
+  /* 侧边栏 */
+  --sidebar-bg: var(--color-gray-950);
+  --sidebar-border: var(--color-gray-300);
+  
+  /* 徽章 */
+  --badge-new-gradient: var(--accent-gradient);
+  
+  /* 徽章边框 - 比 placeholder 更浅的颜色 */
+  --badge-border: var(--color-gray-600);
+  
+  /* 图标 - 使用专用颜色，不直接引用文本令牌 */
+  --icon-primary: #ffffff;
+  --icon-secondary: #ffffff;
+  --icon-tertiary: #ffffff;
+  --icon-disabled: var(--text-disabled);
+}

@@ -1,0 +1,10 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 投影板/屏幕 -->
+  <rect x="3" y="4" width="18" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+  <!-- 投影板支架 -->
+  <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 投影板底座 -->
+  <line x1="8" y1="20" x2="16" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 板内播放按钮（居中） -->
+  <polygon points="11.5,9 11.5,13 15,11" fill="currentColor"/>
+</svg>

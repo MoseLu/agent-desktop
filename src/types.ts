@@ -5,6 +5,18 @@ export interface Settings {
   maxSteps: number
   userName: string
   userPlan: string
+  userAvatar?: string
+  theme: 'light' | 'dark' | 'system'
+  language: string
+  autoOpenTask: boolean
+  desktopNotifications: boolean
+  taskCompleteNotify: boolean
+  soundNotify: boolean
+  // MiniMax Agent 桌面设置
+  showInMenuBar?: boolean
+  autoStart?: boolean
+  shortcut?: string
+  minimaxWorkspace?: string
 }
 
 export interface ToolEvent {
@@ -30,6 +42,14 @@ export interface Conversation {
   title: string
   messages: Message[]
   createdAt: Date
+  tabId?: string  // 关联的标签 ID
+}
+
+export interface Tab {
+  id: string
+  title: string
+  conversationId?: string  // 关联的对话 ID，默认标签为 undefined
+  isDefault: boolean  // 是否为默认标签
 }
 
 export interface AgentEvent {
@@ -48,6 +68,8 @@ declare global {
       onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void
       fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>
       openInExplorer: (p: string) => void
+      setAutoLaunch: (enabled: boolean) => Promise<{ ok: boolean }>
+      getAutoLaunch: () => Promise<{ openAtLogin: boolean }>
     }
   }
 }

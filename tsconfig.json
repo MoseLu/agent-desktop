@@ -14,7 +14,19 @@
     "isolatedModules": true,
     "noEmit": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@layout/*": ["src/components/layout/*"],
+      "@ui/*": ["src/components/ui/*"],
+      "@pages/*": ["src/components/pages/*"],
+      "@modals/*": ["src/components/modals/*"],
+      "@types": ["src/types"],
+      "@contexts/*": ["src/contexts/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@utils/*": ["src/utils/*"],
+      "@config": ["src/config"]
+    }
   },
   "include": ["src"]
 }
