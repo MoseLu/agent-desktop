@@ -3,7 +3,7 @@ import type { Settings } from '@types'
 import { appConfig } from '@config'
 import { CameraOutlined } from '@ant-design/icons'
 import { isElectron } from '@utils/env'
-import { SunIcon, MoonIcon, DesktopIcon } from '@ui/icons'
+import { SunIcon, MoonIcon, DesktopIcon, AlarmCheckIcon } from '@ui/icons'
 import Tooltip from '@ui/Tooltip'
 import { message } from '@ui/Message'
 
@@ -16,9 +16,10 @@ interface Props {
   initial: Settings
   onSave: (s: Partial<Settings>) => Promise<void>
   onClose: () => void
+  onScheduledTasks?: () => void
 }
 
-export default function SettingsModal({ initial, onSave, onClose }: Props) {
+export default function SettingsModal({ initial, onSave, onClose, onScheduledTasks }: Props) {
   const [form, setForm] = useState({ ...initial })
   const [showKey, setShowKey] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
@@ -400,6 +401,7 @@ export default function SettingsModal({ initial, onSave, onClose }: Props) {
               <div style={styles.sidebarSectionTitle}>常规设置</div>
               <NavItem active={activeTab === 'general'} onClick={() => setActiveTab('general')} icon={<SettingsIcon />}>通用</NavItem>
               <NavItem active={activeTab === 'account'} onClick={() => setActiveTab('account')} icon={<UserIcon />}>账号</NavItem>
+              <NavItem active={false} onClick={() => { onClose(); onScheduledTasks?.() }} icon={<AlarmCheckIcon />}>定时任务</NavItem>
             </div>
 
             <div style={styles.sidebarSection}>

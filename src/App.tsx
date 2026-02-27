@@ -318,6 +318,7 @@ function AppContent() {
             }
           }}
           onClose={() => setShowSettings(false)}
+          onScheduledTasks={() => { setShowSettings(false); setPage('scheduled-tasks'); setActiveId(null) }}
         />
       )}
 
