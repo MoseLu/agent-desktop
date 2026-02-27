@@ -28,6 +28,10 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
   const [shortcutInput, setShortcutInput] = useState(form.shortcut || 'Alt+A')
   const [showCommandWhitelist, setShowCommandWhitelist] = useState(false)
   const [showFolderPermissions, setShowFolderPermissions] = useState(false)
+  const [accountDraft, setAccountDraft] = useState({
+    userName: initial.userName ?? '',
+    userAvatar: initial.userAvatar ?? '',
+  })
 
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -91,60 +95,125 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
     const reader = new FileReader()
     reader.onload = async (event) => {
       const base64 = event.target?.result as string
-      set('userAvatar', base64)
+      if (activeTab === 'account') {
+        setAccountDraft(prev => ({ ...prev, userAvatar: base64 }))
+      } else {
+        set('userAvatar', base64)
+      }
     }
     reader.readAsDataURL(file)
   }
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'account':
+      case 'account': {
+        const accountHasChanges =
+          accountDraft.userName !== (initial.userName ?? '') ||
+          accountDraft.userAvatar !== (initial.userAvatar ?? '')
         return (
-          <div style={styles.tabContent}>
-            <div style={styles.sectionTitle}>账号</div>
-            <div style={styles.sectionDesc}>{appConfig.settingsDescriptions.account}</div>
-            
-            <Field label="头像">
-              <Tooltip title="点击上传头像" position="right">
-                <div
-                  style={styles.avatarPreview}
-                  onClick={handleAvatarUpload}
-                  onMouseEnter={() => setIsHoveringAvatar(true)}
-                  onMouseLeave={() => setIsHoveringAvatar(false)}
-                >
-                  {form.userAvatar ? (
-                    <img src={form.userAvatar} alt="头像" style={styles.avatarImage} />
-                  ) : (
-                    <span style={styles.avatarPlaceholder}>{form.userName.charAt(0)}</span>
-                  )}
-                  {/* 悬浮蒙层和编辑图标 */}
-                  {isHoveringAvatar && (
-                    <div style={styles.avatarOverlay}>
-                      <CameraOutlined style={{ fontSize: 28, color: 'white' }} />
+          <div style={{ ...styles.tabContent, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+            <div>
+              <div style={styles.sectionTitle}>账号</div>
+              <div style={styles.sectionDesc}>{appConfig.settingsDescriptions.account}</div>
+
+              <Field label="头像">
+                <Tooltip title="点击上传头像" position="right">
+                  <div
+                    style={styles.avatarPreview}
+                    onClick={handleAvatarUpload}
+                    onMouseEnter={() => setIsHoveringAvatar(true)}
+                    onMouseLeave={() => setIsHoveringAvatar(false)}
+                  >
+                    {accountDraft.userAvatar ? (
+                      <img src={accountDraft.userAvatar} alt="头像" style={styles.avatarImage} />
+                    ) : (
+                      <span style={styles.avatarPlaceholder}>{accountDraft.userName.charAt(0) || '?'}</span>
+                    )}
+                    {isHoveringAvatar && (
+                      <div style={styles.avatarOverlay}>
+                        <CameraOutlined style={{ fontSize: 28, color: 'white' }} />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              </Tooltip>
-            </Field>
+                </Tooltip>
+              </Field>
 
-            <Field label="用户名" required>
-              <input
-                type="text"
-                style={styles.input}
-                value={form.userName}
-                onChange={e => set('userName', e.target.value)}
-                placeholder="请输入用户名"
-              />
-            </Field>
+              <Field label="用户名" required>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={accountDraft.userName}
+                  onChange={e => setAccountDraft(prev => ({ ...prev, userName: e.target.value }))}
+                  placeholder="请输入用户名"
+                />
+              </Field>
 
-            <Field label="UID">
-              <div style={styles.uidDisplay}>
-                <span style={styles.uidText}>483229324081983496</span>
-                <button style={styles.copyBtn}>复制</button>
-              </div>
-            </Field>
+              <Field label="UID">
+                <div style={styles.uidDisplay}>
+                  <span style={styles.uidText}>483229324081983496</span>
+                  <button style={styles.copyBtn}>复制</button>
+                </div>
+              </Field>
+            </div>
+
+            {/* 底部取消 / 保存按钮 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 10,
+              marginTop: 32,
+              paddingTop: 20,
+              borderTop: '1px solid var(--border-light)',
+            }}>
+              <button
+                style={{
+                  padding: '7px 18px',
+                  borderRadius: 7,
+                  border: '1px solid var(--border-medium)',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'opacity 0.15s',
+                }}
+                onClick={() => setAccountDraft({
+                  userName: initial.userName ?? '',
+                  userAvatar: initial.userAvatar ?? '',
+                })}
+              >
+                取消
+              </button>
+              <button
+                disabled={!accountHasChanges || !accountDraft.userName.trim()}
+                style={{
+                  padding: '7px 18px',
+                  borderRadius: 7,
+                  border: 'none',
+                  background: (!accountHasChanges || !accountDraft.userName.trim())
+                    ? 'var(--border-medium)'
+                    : '#0094fc',
+                  color: (!accountHasChanges || !accountDraft.userName.trim())
+                    ? 'var(--text-tertiary)'
+                    : '#fff',
+                  fontSize: 13,
+                  cursor: (!accountHasChanges || !accountDraft.userName.trim()) ? 'not-allowed' : 'pointer',
+                  fontWeight: 500,
+                  transition: 'background 0.15s',
+                }}
+                onClick={() => {
+                  if (!accountDraft.userName.trim()) return
+                  set('userName', accountDraft.userName.trim())
+                  set('userAvatar', accountDraft.userAvatar)
+                  message.success('账号信息已保存', 2000)
+                }}
+              >
+                保存
+              </button>
+            </div>
           </div>
         )
+      }
 
       case 'general':
         return (
