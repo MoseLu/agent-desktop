@@ -142,7 +142,7 @@ export const styles: Record<string, CSSProperties> = {
     background: 'var(--hover-bg)',
   },
   taskTitle: {
-    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     fontSize: 12.5,
   },
   taskTitleRunning: {

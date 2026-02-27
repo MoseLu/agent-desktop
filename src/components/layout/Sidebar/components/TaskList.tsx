@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import type { TaskListProps, TaskItemProps } from '../Sidebar.types'
 import { styles } from '../Sidebar.styles'
 import { TaskIcon, ChevronIcon } from '@ui'
-import { MoreOutlined, ShareAltOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { EllipsisOutlined, ShareAltOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps, message } from 'antd'
 
 interface TaskItemWithMenuProps extends TaskItemProps {
@@ -178,7 +178,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
               e.currentTarget.style.color = 'var(--text-tertiary)'
             }}
           >
-            <MoreOutlined />
+            <EllipsisOutlined />
           </div>
         </Dropdown>
       </div>
