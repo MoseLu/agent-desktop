@@ -21,9 +21,10 @@ export default function SettingsModal({ initial, onSave, onClose }: Props) {
   const [showKey, setShowKey] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
   // 桌面设置状态
-  const [theme, setTheme] = useState('light')
   const [language, setLanguage] = useState('zh-CN')
-  const [autoOpenTask, setAutoOpenTask] = useState(true)
+  const [menuBarEnabled, setMenuBarEnabled] = useState(true)
+  const [autoStart, setAutoStart] = useState(true)
+  const [hotkey, setHotkey] = useState('Alt+A')
   const [desktopNotifications, setDesktopNotifications] = useState(true)
   const [taskCompleteNotify, setTaskCompleteNotify] = useState(true)
   const [soundNotify, setSoundNotify] = useState(false)
@@ -183,30 +184,66 @@ export default function SettingsModal({ initial, onSave, onClose }: Props) {
       case 'desktop-general':
         return (
           <div style={styles.tabContent}>
-            <div style={styles.sectionTitle}>桌面设置 - 通用</div>
-            <div style={styles.sectionDesc}>自定义桌面应用的外观和行为</div>
-            
-            <Field label="主题">
-              <select style={styles.select} value="light">
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
-                <option value="auto">跟随系统</option>
-              </select>
-            </Field>
+            <div style={styles.sectionTitle}>通用</div>
 
-            <Field label="语言">
-              <select style={styles.select} value="zh-CN">
-                <option value="zh-CN">简体中文</option>
+            <SettingRow
+              label="菜单栏"
+              desc="在菜单栏中显示 MiniMax Agent"
+            >
+              <Toggle value={menuBarEnabled} onChange={setMenuBarEnabled} />
+            </SettingRow>
+
+            <SettingRow
+              label="开机自启"
+              desc="登录计算机时自动启动 MiniMax"
+            >
+              <Toggle value={autoStart} onChange={setAutoStart} />
+            </SettingRow>
+
+            <SettingRow
+              label="快捷键唤起小窗"
+              desc="在桌面任意位置唤醒 MiniMax Agent"
+            >
+              <div style={styles.hotkeyBox}>
+                <span style={styles.hotkeyText}>{hotkey}</span>
+                <button style={styles.hotkeyClear} onClick={() => setHotkey('')} title="清除">✕</button>
+              </div>
+            </SettingRow>
+
+            <SettingRow
+              label="工作区路径"
+              desc={form.workspace || '未设置'}
+            >
+              <button style={styles.rowBtn} onClick={pickFolder}>更改</button>
+            </SettingRow>
+
+            <SettingRow
+              label="命令白名单"
+              desc="允许自动运行的命令"
+            >
+              <button style={styles.rowBtn}>编辑</button>
+            </SettingRow>
+
+            <SettingRow
+              label="文件夹访问权限"
+              desc="已授予读写权限的文件夹"
+            >
+              <button style={styles.rowBtn}>编辑</button>
+            </SettingRow>
+
+            <SettingRow
+              label="语言"
+              desc=""
+            >
+              <select
+                style={styles.rowSelect}
+                value={language}
+                onChange={e => setLanguage(e.target.value)}
+              >
+                <option value="zh-CN">中文</option>
                 <option value="en">English</option>
               </select>
-            </Field>
-
-            <Field label="启动时自动打开新任务">
-              <label style={styles.checkbox}>
-                <input type="checkbox" defaultChecked />
-                <span>启用</span>
-              </label>
-            </Field>
+            </SettingRow>
           </div>
         )
 
@@ -318,6 +355,29 @@ function Field({ label, hint, extra, children, required }: { label: string; hint
       {children}
       {hint && <span style={styles.fieldHint}>{hint}</span>}
     </div>
+  )
+}
+
+function SettingRow({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div style={styles.settingRow}>
+      <div style={styles.settingRowLeft}>
+        <div style={styles.settingRowLabel}>{label}</div>
+        {desc && <div style={styles.settingRowDesc}>{desc}</div>}
+      </div>
+      <div style={styles.settingRowRight}>{children}</div>
+    </div>
+  )
+}
+
+function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      style={{ ...styles.toggleTrack, ...(value ? styles.toggleTrackOn : {}) }}
+      onClick={() => onChange(!value)}
+    >
+      <div style={{ ...styles.toggleThumb, ...(value ? styles.toggleThumbOn : {}) }} />
+    </button>
   )
 }
 
@@ -560,5 +620,63 @@ const styles: Record<string, React.CSSProperties> = {
   checkbox: {
     display: 'flex', alignItems: 'center', gap: 10,
     cursor: 'pointer', fontSize: 13.5, color: '#333',
+  },
+  // ─── SettingRow ───────────────────────────────────────────────────────────
+  settingRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 0', borderBottom: '1px solid #f5f5f5', gap: 16,
+  },
+  settingRowLeft: {
+    flex: 1, minWidth: 0,
+  },
+  settingRowLabel: {
+    fontSize: 13.5, fontWeight: 500, color: '#1a1a1a', marginBottom: 3,
+  },
+  settingRowDesc: {
+    fontSize: 12, color: '#999', lineHeight: 1.4,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  settingRowRight: {
+    flexShrink: 0, display: 'flex', alignItems: 'center',
+  },
+  // ─── Toggle switch ────────────────────────────────────────────────────────
+  toggleTrack: {
+    width: 42, height: 24, borderRadius: 12, background: '#e5e7eb',
+    border: 'none', cursor: 'pointer', position: 'relative', padding: 0,
+    transition: 'background 0.2s', flexShrink: 0,
+  },
+  toggleTrackOn: { background: '#3b82f6' },
+  toggleThumb: {
+    position: 'absolute', width: 18, height: 18, borderRadius: '50%',
+    background: '#fff', top: 3, left: 3,
+    transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+  },
+  toggleThumbOn: { left: 21 },
+  // ─── Row controls ─────────────────────────────────────────────────────────
+  rowBtn: {
+    border: '1px solid #e8e8e8', background: '#fff', borderRadius: 8,
+    padding: '6px 16px', fontSize: 13, color: '#333',
+    cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+    transition: 'background 0.1s',
+  },
+  rowSelect: {
+    border: '1px solid #e8e8e8', borderRadius: 8,
+    padding: '6px 10px', fontSize: 13, color: '#333', outline: 'none',
+    background: '#fff', fontFamily: 'inherit', cursor: 'pointer',
+    minWidth: 90,
+  },
+  hotkeyBox: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    border: '1px solid #e8e8e8', borderRadius: 8, padding: '4px 8px 4px 12px',
+    background: '#fafafa',
+  },
+  hotkeyText: {
+    fontSize: 12.5, color: '#333', fontFamily: "'IBM Plex Mono', monospace",
+    fontWeight: 500,
+  },
+  hotkeyClear: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: '#bbb', fontSize: 12, padding: '2px 4px', lineHeight: 1,
+    borderRadius: 4, display: 'flex', alignItems: 'center',
   },
 }
