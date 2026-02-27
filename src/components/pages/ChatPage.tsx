@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { Settings, Conversation, Message, AgentEvent, ToolEvent } from '@types'
 import IconButton from '@ui/IconButton'
 import Tooltip from '@ui/Tooltip'
@@ -53,9 +53,9 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
           const msgs = [...conv.messages]
           const last = msgs[msgs.length - 1]
           if (last?.role === 'assistant' && last.streaming) {
-            msgs[msgs.length - 1] = { ...last, content: last.content + (ev.text as string) }
+            msgs[msgs.length - 1] = { ...last, content: last.content + ev.text }
           } else {
-            msgs.push({ role: 'assistant', content: ev.text as string, streaming: true, events: [] })
+            msgs.push({ role: 'assistant', content: ev.text, streaming: true, events: [] })
           }
           return { messages: msgs }
         })
@@ -65,7 +65,7 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
         onUpdate(conv => {
           const msgs = [...conv.messages]
           const last = msgs[msgs.length - 1]
-          const toolEv: ToolEvent = { type: 'tool_start', id: ev.id as string, name: ev.name as string, input: ev.input as Record<string, unknown> }
+          const toolEv: ToolEvent = { type: 'tool_start', id: ev.id, name: ev.name, input: ev.input }
           if (last?.role === 'assistant') {
             msgs[msgs.length - 1] = { ...last, events: [...(last.events ?? []), toolEv] }
           } else {
@@ -80,7 +80,7 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
           const last = msgs[msgs.length - 1]
           if (last?.role === 'assistant') {
             const events = (last.events ?? []).map(e =>
-              e.id === ev.id ? { ...e, type: 'tool_result' as const, result: ev.result as Record<string, unknown>, duration: ev.duration as number, isError: ev.isError as boolean } : e
+              e.id === ev.id ? { ...e, type: 'tool_result' as const, result: ev.result, duration: ev.duration, isError: ev.isError } : e
             )
             msgs[msgs.length - 1] = { ...last, events }
           }
@@ -348,9 +348,9 @@ function MessageBubble({ message, selectedToolId, onSelectTool, onShowFiles }: {
     <div style={msgStyles.assistantRow}>
       <div style={msgStyles.avatar}><AvatarIcon /></div>
       <div style={msgStyles.assistantContent}>
-        {message.events?.map((ev, i) => (
+        {message.events?.map(ev => (
           <ToolBlock
-            key={i}
+            key={ev.id}
             event={ev}
             isSelected={selectedToolId === ev.id}
             onSelect={onSelectTool}
@@ -441,11 +441,11 @@ function ToolDetailPanel({ panel, onClose, onSelectTool }: {
           <button style={detailStyles.closeBtn} onClick={onClose}>×</button>
         </div>
         <div style={detailStyles.body}>
-          {panel.events.map((ev, i) => {
+          {panel.events.map(ev => {
             const path = getToolSummary(ev)
             const tag = TOOL_NAMES[ev.name] || ev.name
             return (
-              <button key={i} style={detailStyles.fileItem} onClick={() => onSelectTool(ev)}>
+              <button key={ev.id} style={detailStyles.fileItem} onClick={() => onSelectTool(ev)}>
                 <span style={detailStyles.fileIcon}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
@@ -521,7 +521,7 @@ function ToolDetailPanel({ panel, onClose, onSelectTool }: {
 }
 
 function SimpleMarkdown({ text }: { text: string }) {
-  const lines = text.split('\n')
+  const lines = useMemo(() => text.split('\n'), [text])
   return (
     <div>
       {lines.map((line, i) => {

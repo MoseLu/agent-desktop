@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { Settings, FolderPermission } from '@types'
 import { appConfig } from '@config'
 import { CameraOutlined } from '@ant-design/icons'
@@ -33,30 +33,38 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
     userAvatar: initial.userAvatar ?? '',
   })
 
+  // 防抖磁盘写入：积累所有待保存字段，500ms 后批量写入
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingRef = useRef<Partial<Settings>>({})
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
+
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => {
     setForm(prev => ({ ...prev, [k]: v }))
-    // 所有设置变化时立即保存并通知父组件
-    if (isElectron()) {
-      window.electron.saveSettings({ [k]: v })
-    } else {
-      // 浏览器模式下存储到 localStorage
-      try {
-        const stored = localStorage.getItem('app-settings')
-        const settings = stored ? JSON.parse(stored) : {}
-        settings[k] = v
-        localStorage.setItem('app-settings', JSON.stringify(settings))
-      } catch (err) {
-        console.error('Failed to save settings to localStorage:', err)
+    onSave({ [k]: v })  // 立即更新父组件 React 状态（廉价操作）
+
+    // 积累变更，防抖写盘
+    pendingRef.current = { ...pendingRef.current, [k]: v }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      const toSave = pendingRef.current
+      pendingRef.current = {}
+      if (isElectron()) {
+        window.electron.saveSettings(toSave)
+      } else {
+        try {
+          const stored = localStorage.getItem('app-settings')
+          const existing = stored ? JSON.parse(stored) : {}
+          localStorage.setItem('app-settings', JSON.stringify({ ...existing, ...toSave }))
+        } catch (err) {
+          console.error('Failed to save settings to localStorage:', err)
+        }
       }
-      console.log('[Browser Mode] Settings updated:', k, v)
-    }
-    // 如果是主题切换，先同步更新 DOM 再通知父组件，避免水合闪烁
-    if (k === 'theme') {
-      // 直接调用父组件传入的 onSave，让它在更新 React 状态前先应用 DOM
-      onSave({ [k]: v })
-    } else {
-      onSave({ [k]: v })
-    }
+    }, 500)
   }
 
   const pickFolder = async () => {

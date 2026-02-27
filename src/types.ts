@@ -59,10 +59,16 @@ export interface Tab {
   isDefault: boolean  // 是否为默认标签
 }
 
-export interface AgentEvent {
-  type: 'start' | 'step' | 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'stopped' | 'thinking'
-  [key: string]: unknown
-}
+export type AgentEvent =
+  | { type: 'start'; workspace: string }
+  | { type: 'step'; step: number; maxSteps: number }
+  | { type: 'text'; text: string }
+  | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; id: string; name: string; input: Record<string, unknown>; result: Record<string, unknown>; duration: number; isError: boolean }
+  | { type: 'done'; text: string; steps: number }
+  | { type: 'error'; message: string }
+  | { type: 'stopped' }
+  | { type: 'thinking'; message: string }
 
 declare global {
   interface Window {

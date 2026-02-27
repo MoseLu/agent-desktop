@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import type { TaskListProps, TaskItemProps } from '../Sidebar.types'
 import { styles } from '../Sidebar.styles'
 import { TaskIcon, ChevronIcon } from '@ui'
@@ -13,11 +13,12 @@ interface TaskItemWithMenuProps extends TaskItemProps {
 function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHoverChange, onRename, onCopyId }: TaskItemWithMenuProps) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(conversation.title)
+  const [menuBtnHovered, setMenuBtnHovered] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // 检查任务是否正在进行
   const isRunning = conversation.messages.some(msg => msg.streaming)
-  
+
   // 编辑模式下自动聚焦
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -26,17 +27,17 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
     }
   }, [editing])
 
-  const handleShare = () => {
+  const handleShare = useCallback(() => {
     onCopyId(conversation.id)
-  }
+  }, [onCopyId, conversation.id])
 
-  const handleRename = () => {
+  const handleRename = useCallback(() => {
     setEditing(true)
-  }
+  }, [])
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     onDelete()
-  }
+  }, [onDelete])
 
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -61,8 +62,8 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
     setEditing(false)
   }
 
-  // Dropdown 菜单项
-  const menuItems: MenuProps['items'] = [
+  // Dropdown 菜单项 — memoized，仅在回调变化时重建
+  const menuItems = useMemo<MenuProps['items']>(() => [
     {
       key: 'share',
       icon: <ShareAltOutlined />,
@@ -84,7 +85,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
       label: <span style={{ color: 'var(--error)' }}>删除</span>,
       onClick: handleDelete,
     },
-  ]
+  ], [handleShare, handleRename, handleDelete])
 
   return (
     <div
@@ -165,18 +166,13 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
               justifyContent: 'center',
               cursor: 'pointer',
               borderRadius: 4,
-              color: 'var(--text-tertiary)',
+              color: menuBtnHovered ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              background: menuBtnHovered ? 'var(--hover-bg)' : 'transparent',
               transition: 'background 0.15s, color 0.15s',
               fontSize: 16,
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--hover-bg)'
-              e.currentTarget.style.color = 'var(--text-primary)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.color = 'var(--text-tertiary)'
-            }}
+            onMouseEnter={() => setMenuBtnHovered(true)}
+            onMouseLeave={() => setMenuBtnHovered(false)}
           >
             <EllipsisOutlined />
           </div>

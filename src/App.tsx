@@ -12,6 +12,25 @@ import { TabBar } from '@components/TabBar'
 import { appConfig } from '@config'
 import { isElectron, callElectron } from '@utils/env'
 
+const DEFAULT_SETTINGS: Settings = {
+  apiKey: '',
+  workspace: '',
+  model: 'qwen3-coder-next',
+  maxSteps: 10,
+  userName: '开发者',
+  userPlan: 'free',
+  userAvatar: '',
+  theme: 'system',
+  language: 'zh-CN',
+  autoOpenTask: false,
+  desktopNotifications: false,
+  taskCompleteNotify: false,
+  soundNotify: false,
+  showInMenuBar: true,
+  autoStart: false,
+  shortcut: 'Alt+A',
+}
+
 function AppContent() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -33,55 +52,12 @@ function AppContent() {
       try {
         const stored = localStorage.getItem('app-settings')
         const savedSettings = stored ? JSON.parse(stored) : null
-        
-        const defaultSettings: Settings = {
-          apiKey: '',
-          workspace: '',
-          model: 'qwen3-coder-next',
-          maxSteps: 10,
-          userName: '开发者',
-          userPlan: 'free',
-          userAvatar: '',
-          theme: 'system',
-          language: 'zh-CN',
-          autoOpenTask: false,
-          desktopNotifications: false,
-          taskCompleteNotify: false,
-          soundNotify: false,
-          showInMenuBar: true,
-          autoStart: false,
-          shortcut: 'Alt+A',
-        }
-        
-        // 合并保存的设置和默认设置
-        const settings = savedSettings 
-          ? { ...defaultSettings, ...savedSettings }
-          : defaultSettings
-        
-        setSettings(settings)
-        setTheme(settings.theme || 'system')
+        const merged = savedSettings ? { ...DEFAULT_SETTINGS, ...savedSettings } : DEFAULT_SETTINGS
+        setSettings(merged)
+        setTheme(merged.theme || 'system')
       } catch (err) {
         console.error('Failed to load settings from localStorage:', err)
-        // 使用默认设置
-        const defaultSettings: Settings = {
-          apiKey: '',
-          workspace: '',
-          model: 'qwen3-coder-next',
-          maxSteps: 10,
-          userName: '开发者',
-          userPlan: 'free',
-          userAvatar: '',
-          theme: 'system',
-          language: 'zh-CN',
-          autoOpenTask: false,
-          desktopNotifications: false,
-          taskCompleteNotify: false,
-          soundNotify: false,
-          showInMenuBar: true,
-          autoStart: false,
-          shortcut: 'Alt+A',
-        }
-        setSettings(defaultSettings)
+        setSettings(DEFAULT_SETTINGS)
         setTheme('system')
       }
       return
