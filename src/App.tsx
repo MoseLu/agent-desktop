@@ -28,24 +28,62 @@ function AppContent() {
   useEffect(() => {
     // 使用环境变量检测并获取设置
     if (!isElectron()) {
-      console.warn('未在 Electron 环境中运行，使用模拟数据')
-      // 在浏览器开发模式下使用模拟数据
-      const mockSettings: Settings = {
-        apiKey: '',
-        workspace: '',
-        model: 'qwen3-coder-next',
-        maxSteps: 10,
-        userName: '开发者',
-        userPlan: 'free',
-        theme: 'system',
-        language: 'zh-CN',
-        autoOpenTask: false,
-        desktopNotifications: false,
-        taskCompleteNotify: false,
-        soundNotify: false,
+      console.warn('未在 Electron 环境中运行，使用本地存储数据')
+      // 在浏览器开发模式下从 localStorage 读取设置
+      try {
+        const stored = localStorage.getItem('app-settings')
+        const savedSettings = stored ? JSON.parse(stored) : null
+        
+        const defaultSettings: Settings = {
+          apiKey: '',
+          workspace: '',
+          model: 'qwen3-coder-next',
+          maxSteps: 10,
+          userName: '开发者',
+          userPlan: 'free',
+          userAvatar: '',
+          theme: 'system',
+          language: 'zh-CN',
+          autoOpenTask: false,
+          desktopNotifications: false,
+          taskCompleteNotify: false,
+          soundNotify: false,
+          showInMenuBar: true,
+          autoStart: false,
+          shortcut: 'Alt+A',
+        }
+        
+        // 合并保存的设置和默认设置
+        const settings = savedSettings 
+          ? { ...defaultSettings, ...savedSettings }
+          : defaultSettings
+        
+        setSettings(settings)
+        setTheme(settings.theme || 'system')
+      } catch (err) {
+        console.error('Failed to load settings from localStorage:', err)
+        // 使用默认设置
+        const defaultSettings: Settings = {
+          apiKey: '',
+          workspace: '',
+          model: 'qwen3-coder-next',
+          maxSteps: 10,
+          userName: '开发者',
+          userPlan: 'free',
+          userAvatar: '',
+          theme: 'system',
+          language: 'zh-CN',
+          autoOpenTask: false,
+          desktopNotifications: false,
+          taskCompleteNotify: false,
+          soundNotify: false,
+          showInMenuBar: true,
+          autoStart: false,
+          shortcut: 'Alt+A',
+        }
+        setSettings(defaultSettings)
+        setTheme('system')
       }
-      setSettings(mockSettings)
-      setTheme('system')
       return
     }
 
@@ -311,11 +349,12 @@ function AppContent() {
           initial={settings}
           onSave={async (s) => {
             // 设置已自动保存，这里只需要更新本地状态
-            setSettings({ ...settings, ...s })
-            // 如果是主题变化，更新 ThemeProvider
+            // 如果是主题变化，先应用 DOM 再更新 React 状态，避免水合闪烁
             if (s.theme) {
+              // ThemeProvider 的 setTheme 已经处理了 DOM 同步更新
               setTheme(s.theme)
             }
+            setSettings({ ...settings, ...s })
           }}
           onClose={() => setShowSettings(false)}
           onScheduledTasks={() => { setShowSettings(false); setPage('scheduled-tasks'); setActiveId(null) }}

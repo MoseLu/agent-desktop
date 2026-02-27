@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { InfoIcon, AlarmCheckIcon } from '@ui'
 import NewScheduledTaskModal from '@modals/NewScheduledTaskModal'
+import { appConfig } from '@config'
 
 interface Props {
   onBack?: () => void
@@ -40,7 +41,7 @@ export default function ScheduledTasksPage({ onBack }: Props) {
           <AlarmCheckIcon size={56} style={{ color: 'var(--text-tertiary)', opacity: 0.35 }} />
         </div>
         <div style={styles.emptyTitle}>开始添加定时任务</div>
-        <div style={styles.emptyDesc}>安排未来任务，让MiniMax代理按时处理您的日常工作。</div>
+        <div style={styles.emptyDesc}>安排未来任务，让{appConfig.appName}代理按时处理您的日常工作。</div>
         <button style={styles.addBtn} onClick={() => setShowCreate(true)}>
           <span style={{ fontSize: 16, lineHeight: 1, marginRight: 4 }}>+</span>
           新建定时任务
@@ -155,3 +156,4 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
   },
 }
+

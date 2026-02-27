@@ -10,7 +10,7 @@ import { message } from '@ui/Message'
 // 模型列表预留 - 后续从后端 API 获取
 const DEFAULT_MODELS: Array<{ id: string; label: string }> = []
 
-type SettingsTab = 'account' | 'general' | 'desktop-general' | 'notifications'
+type SettingsTab = 'account' | 'general' | 'desktop-general' | 'notifications' | 'scheduled-tasks'
 
 interface Props {
   initial: Settings
@@ -33,9 +33,24 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
     if (isElectron()) {
       window.electron.saveSettings({ [k]: v })
     } else {
+      // 浏览器模式下存储到 localStorage
+      try {
+        const stored = localStorage.getItem('app-settings')
+        const settings = stored ? JSON.parse(stored) : {}
+        settings[k] = v
+        localStorage.setItem('app-settings', JSON.stringify(settings))
+      } catch (err) {
+        console.error('Failed to save settings to localStorage:', err)
+      }
       console.log('[Browser Mode] Settings updated:', k, v)
     }
-    onSave({ [k]: v })
+    // 如果是主题切换，先同步更新 DOM 再通知父组件，避免水合闪烁
+    if (k === 'theme') {
+      // 直接调用父组件传入的 onSave，让它在更新 React 状态前先应用 DOM
+      onSave({ [k]: v })
+    } else {
+      onSave({ [k]: v })
+    }
   }
 
   const pickFolder = async () => {
@@ -210,7 +225,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
             {/* 快捷键唤起小窗 */}
             <DesktopRow
               label="快捷键唤起小窗"
-              desc="在桌面任意位置唤醒 MiniMax Agent"
+              desc={`在桌面任意位置唤醒 ${appConfig.appName}`}
               control={
                 <div style={styles.shortcutWrapper}>
                   <input
@@ -289,7 +304,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       case 'notifications':
         return (
           <div style={{ ...styles.tabContent, maxWidth: '100%' }}>
-            {/* Permission card */}
+            {/* Permission card - 通知权限卡片 */}
             <div style={styles.notifyCard}>
               <div style={styles.notifyCardLeft}>
                 <div style={styles.notifyCardIcon}>
@@ -309,6 +324,8 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
                 onClick={() => {
                   if (isElectron()) {
                     window.electron.openExternal('ms-settings:notifications')
+                  } else {
+                    message.warning('请在桌面版中使用此功能', 3000)
                   }
                 }}
               >
@@ -353,6 +370,24 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
           </div>
         )
 
+      case 'scheduled-tasks':
+        return (
+          <div style={{ ...styles.tabContent, maxWidth: '100%', padding: 0 }}>
+            {/* 定时任务面板内容 - 左右布局 */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>定时任务</div>
+                <div style={{ fontSize: 13, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+                  {appConfig.appName} 智能体可以在完成任务后安排再次运行。
+                </div>
+              </div>
+              <button style={styles.manageBtn} onClick={() => onScheduledTasks?.()}>
+                管理
+              </button>
+            </div>
+          </div>
+        )
+
       default:
         return null
     }
@@ -364,6 +399,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       case 'account': return '账号'
       case 'desktop-general': return '通用'
       case 'notifications': return '通知'
+      case 'scheduled-tasks': return '定时任务'
       default: return ''
     }
   }
@@ -432,7 +468,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
               <div style={styles.sidebarSectionTitle}>常规设置</div>
               <NavItem active={activeTab === 'general'} onClick={() => setActiveTab('general')} icon={<SettingsIcon />}>通用</NavItem>
               <NavItem active={activeTab === 'account'} onClick={() => setActiveTab('account')} icon={<UserIcon />}>账号</NavItem>
-              <NavItem active={false} onClick={() => { onClose(); onScheduledTasks?.() }} icon={<AlarmCheckIcon />}>定时任务</NavItem>
+              <NavItem active={activeTab === 'scheduled-tasks'} onClick={() => setActiveTab('scheduled-tasks')} icon={<AlarmCheckIcon />}>定时任务</NavItem>
             </div>
 
             <div style={styles.sidebarSection}>
@@ -578,6 +614,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sidebarHeader: {
     padding: '20px 24px',
+    borderBottom: 'none',
   },
   sidebarTitle: {
     fontSize: 14, fontWeight: 400, color: 'var(--text-primary)',
@@ -586,7 +623,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1, padding: '16px 12px', overflowY: 'auto',
   },
   sidebarSection: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sidebarSectionTitle: {
     fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)',

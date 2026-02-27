@@ -4,13 +4,13 @@ import { styles } from '../Sidebar.styles'
 import { Avatar } from '@ui/Avatar'
 import Tooltip from '@ui/Tooltip'
 import {
-  SettingsIcon,
-  ContactIcon,
-  InfoIcon,
-  LogoutIcon,
-  ChevronIcon,
-  AlarmCheckIcon,
-} from '@ui'
+  SettingOutlined,
+  ClockCircleOutlined,
+  CustomerServiceOutlined,
+  InfoCircleOutlined,
+  LogoutOutlined,
+  RightOutlined,
+} from '@ant-design/icons'
 
 export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpenChange, collapsed = false }: UserMenuProps) {
   const displayName = settings.userName || '开发者'
@@ -38,47 +38,34 @@ export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpe
         {/* Dropdown menu */}
         {isOpen && (
           <div style={styles.userMenu}>
-            <div style={styles.menuHeader}>
-              <span style={{ fontWeight: 500 }}>个人</span>
-              <button style={styles.upgradeBtn}>升级</button>
-            </div>
-            
             <div style={styles.menuItem} onClick={() => { onOpenChange(false); onScheduledTasks(); }}>
-              <AlarmCheckIcon size={16} />
+              <ClockCircleOutlined style={{ fontSize: 16 }} />
               <span>定时任务</span>
             </div>
 
             <div style={styles.menuItem} onClick={() => { onOpenChange(false); onSettings(); }}>
-              <SettingsIcon size={16} />
+              <SettingOutlined style={{ fontSize: 16 }} />
               <span>设置</span>
             </div>
 
             <div style={styles.menuItem}>
-              <ContactIcon size={16} />
+              <CustomerServiceOutlined style={{ fontSize: 16 }} />
               <span>联系我们</span>
-              <ChevronIcon 
-                rotated={false} 
-                size={10}
+              <RightOutlined 
                 style={{ 
-                  transform: 'rotate(-90deg)', 
+                  fontSize: 10,
                   marginLeft: 'auto',
-                  width: 10, 
-                  height: 10 
                 }} 
               />
             </div>
             
             <div style={styles.menuItem}>
-              <InfoIcon size={16} />
+              <InfoCircleOutlined style={{ fontSize: 16 }} />
               <span>了解更多</span>
-              <ChevronIcon 
-                rotated={false} 
-                size={10}
+              <RightOutlined 
                 style={{ 
-                  transform: 'rotate(-90deg)', 
+                  fontSize: 10,
                   marginLeft: 'auto',
-                  width: 10, 
-                  height: 10 
                 }} 
               />
             </div>
@@ -86,7 +73,7 @@ export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpe
             <div style={styles.menuDivider} />
             
             <div style={styles.menuItem} onClick={() => onOpenChange(false)}>
-              <LogoutIcon size={16} />
+              <LogoutOutlined style={{ fontSize: 16 }} />
               <span style={{ color: 'var(--error)' }}>退出登录</span>
             </div>
           </div>
@@ -118,45 +105,34 @@ export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpe
       {/* Dropdown menu (collapsed) */}
       {isOpen && (
         <div style={styles.userMenuCollapsed}>
-          <div style={styles.menuHeader}>
-            <span style={{ fontWeight: 500 }}>个人</span>
-            <button style={styles.upgradeBtn}>升级</button>
-          </div>
-          
           <div style={styles.menuItem} onClick={() => { onOpenChange(false); onScheduledTasks(); }}>
-            <AlarmCheckIcon />
+            <ClockCircleOutlined />
             <span>定时任务</span>
           </div>
 
           <div style={styles.menuItem} onClick={() => { onOpenChange(false); onSettings(); }}>
-            <SettingsIcon />
+            <SettingOutlined />
             <span>设置</span>
           </div>
 
           <div style={styles.menuItem}>
-            <ContactIcon />
+            <CustomerServiceOutlined />
             <span>联系我们</span>
-            <ChevronIcon 
-              rotated={false}
+            <RightOutlined 
               style={{ 
-                transform: 'rotate(-90deg)', 
+                fontSize: 10,
                 marginLeft: 'auto',
-                width: 10, 
-                height: 10 
               }} 
             />
           </div>
           
           <div style={styles.menuItem}>
-            <InfoIcon />
+            <InfoCircleOutlined />
             <span>了解更多</span>
-            <ChevronIcon 
-              rotated={false}
+            <RightOutlined 
               style={{ 
-                transform: 'rotate(-90deg)', 
+                fontSize: 10,
                 marginLeft: 'auto',
-                width: 10, 
-                height: 10 
               }} 
             />
           </div>
@@ -164,7 +140,7 @@ export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpe
           <div style={styles.menuDivider} />
           
           <div style={styles.menuItem} onClick={() => onOpenChange(false)}>
-            <LogoutIcon />
+            <LogoutOutlined />
             <span style={{ color: 'var(--error)' }}>退出登录</span>
           </div>
         </div>
