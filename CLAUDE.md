@@ -19,6 +19,10 @@ This file provides AI assistants with a comprehensive overview of the Agent Desk
 
 ```
 agent-desktop/
+├── .claude/                     # Claude Code configuration
+│   ├── settings.json            # SessionStart hook registration
+│   └── hooks/
+│       └── session-start.sh     # Auto-installs pnpm deps in remote sessions
 ├── electron/                    # Electron main process & agent backend
 │   ├── main.js                  # Window creation, IPC handlers
 │   ├── preload.js               # Security bridge (context isolation)
@@ -33,19 +37,18 @@ agent-desktop/
 │   ├── types.ts                 # Shared TypeScript type definitions
 │   ├── electron-mock.ts         # Browser-side mock for Electron API
 │   └── components/
-│       ├── Sidebar.tsx          # Left nav: conversation list, user menu
-│       ├── HomePage.tsx         # Landing: input, quick chips, expert cards
-│       ├── ChatPage.tsx         # Chat UI: messages, tool viz, streaming
-│       └── SettingsModal.tsx    # Multi-tab settings overlay
+│       ├── layout/Sidebar/      # Left nav: conversation list, user menu
+│       ├── pages/               # HomePage, ChatPage
+│       ├── ui/                  # Reusable UI components
+│       ├── modals/              # SettingsModal, SearchModal
+│       └── TabBar/              # Tab management
 ├── scripts/
 │   └── dev-runner.js            # Dev launcher (port cleanup, orchestration)
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
 ├── pnpm-workspace.yaml
-├── README.md                    # Chinese-language user documentation
-├── DEV_INFO.md                  # Development setup notes
-└── DEV_NOTES.md                 # Completion notes
+└── README.md                    # Chinese-language user documentation
 ```
 
 ---
@@ -188,6 +191,8 @@ pnpm dev:electron  # Electron only (requires Vite running)
 pnpm typecheck     # tsc --noEmit, no output files
 ```
 
+> **Note:** `pnpm typecheck` currently reports pre-existing type errors from `antd 6.x` / `rc-component` library type mismatches with React 18, and some path alias resolution issues. These do not affect the Vite build or runtime behavior.
+
 ### Production build
 ```bash
 pnpm build         # vite build + electron-builder
@@ -196,10 +201,27 @@ Output goes to `dist-electron/`. Windows NSIS installer is the default target.
 
 ---
 
+## TypeScript Path Aliases
+
+| Alias | Resolves to |
+|---|---|
+| `@/*` | `src/*` |
+| `@components/*` | `src/components/*` |
+| `@layout/*` | `src/components/layout/*` |
+| `@ui/*` | `src/components/ui/*` |
+| `@pages/*` | `src/components/pages/*` |
+| `@modals/*` | `src/components/modals/*` |
+| `@types` | `src/types` |
+| `@contexts/*` | `src/contexts/*` |
+| `@utils/*` | `src/utils/*` |
+| `@config` | `src/config` |
+
+---
+
 ## TypeScript Configuration
 
 - **Strict mode:** enabled
-- **Path alias:** `@/*` maps to `src/*`
+- **Path aliases:** see table above
 - **Target:** ESNext
 - **Module:** ESNext with bundler resolution
 - **`noEmit: true`** — TypeScript is type-check only; Vite handles transpilation
@@ -208,10 +230,8 @@ Output goes to `dist-electron/`. Windows NSIS installer is the default target.
 
 ## Styling Conventions
 
-- **No external CSS library** — all styles are inline `CSSProperties` objects in React components
-- Style objects are defined at the **bottom** of each component file
-- Global styles (resets, animations, scrollbar, fonts) live in `src/index.html` `<style>` block
-- **Color palette:** Light mode — backgrounds `#fff`/`#fafafa`/`#f5f5f5`, text `#1a1a1a`/`#666`
+- Global CSS design tokens in `src/styles/design-tokens/` (3-level system: base → alias → component)
+- Light/dark/system theme switching via `ThemeProvider` context
 - **Fonts:** Noto Sans SC (UI), IBM Plex Mono (code/terminal)
 - **Layout:** Flexbox throughout
 
@@ -225,6 +245,21 @@ Output goes to `dist-electron/`. Windows NSIS installer is the default target.
 - **Async:** Promise-based with `async/await`; event emitters used only in the agent loop
 - **Backend:** Pure CommonJS (`require`/`module.exports`) in `electron/`
 - **Frontend:** ES modules with TypeScript in `src/`
+
+---
+
+## Claude Code Session Setup (`.claude/`)
+
+A `SessionStart` hook is configured to automatically install dependencies when opening this project in a **Claude Code remote (web) session**:
+
+```
+.claude/
+├── settings.json          # Registers the SessionStart hook
+└── hooks/
+    └── session-start.sh   # Runs pnpm install on remote session start
+```
+
+The hook only activates in remote environments (`$CLAUDE_CODE_REMOTE=true`) and is safe to run multiple times (idempotent). It runs **synchronously**, ensuring all packages are installed before the session begins.
 
 ---
 
@@ -259,8 +294,8 @@ When modifying or understanding the codebase, focus on these files:
 | `electron/main.js` | Adding new IPC channels or OS-level features |
 | `electron/preload.js` | Exposing new APIs to the renderer |
 | `src/App.tsx` | Global state, routing, settings loading |
-| `src/components/ChatPage.tsx` | Message rendering, streaming, tool visualization |
-| `src/components/SettingsModal.tsx` | Settings UI, all user-configurable options |
+| `src/components/pages/ChatPage.tsx` | Message rendering, streaming, tool visualization |
+| `src/components/modals/SettingsModal.tsx` | Settings UI, all user-configurable options |
 
 ---
 
