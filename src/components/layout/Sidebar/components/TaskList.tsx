@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import type { TaskListProps, TaskItemProps } from '../Sidebar.types'
 import { styles } from '../Sidebar.styles'
 import { TaskIcon, ChevronIcon } from '@ui'
-import { EllipsisOutlined, ShareAltOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { MoreOutlined, ShareAltOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps, message } from 'antd'
 
 interface TaskItemWithMenuProps extends TaskItemProps {
@@ -128,17 +128,18 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
           {conversation.title}
         </span>
       )}
-      {/* 三点菜单按钮 - 只在 hover 时显示 */}
+      {/* 三点菜单按钮 - hover 时可见，始终占位防止文字抖动 */}
       <div
         style={{
-          display: isHovered ? 'flex' : 'none',
+          visibility: isHovered ? 'visible' : 'hidden',
+          display: 'flex',
           alignItems: 'center',
-          marginLeft: 'auto',
+          flexShrink: 0,
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <Dropdown
-          menu={{ 
+          menu={{
             items: menuItems,
             style: {
               borderRadius: 8,
@@ -148,7 +149,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
           }}
           trigger={['click']}
           placement="bottomRight"
-          getPopupContainer={(trigger) => trigger.parentElement as HTMLElement}
+          getPopupContainer={() => document.body}
           styles={{
             root: {
               minWidth: 120,
@@ -157,16 +158,16 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
         >
           <div
             style={{
-              width: 28,
-              height: 28,
+              width: 24,
+              height: 24,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              borderRadius: 6,
+              borderRadius: 4,
               color: 'var(--text-tertiary)',
-              transition: 'all 0.15s',
-              fontSize: 14,
+              transition: 'background 0.15s, color 0.15s',
+              fontSize: 16,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--hover-bg)'
@@ -177,7 +178,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
               e.currentTarget.style.color = 'var(--text-tertiary)'
             }}
           >
-            <EllipsisOutlined />
+            <MoreOutlined />
           </div>
         </Dropdown>
       </div>
