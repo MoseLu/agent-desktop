@@ -74,7 +74,7 @@ export default function HomePage({ settings, onStartTask }: Props) {
 
       <div style={styles.center}>
         {/* Hero title */}
-        <h1 style={styles.heroTitle}>Agent Desktop，让你的工作更轻松</h1>
+        <h1 style={styles.heroTitle}>MiniMax Agent，让你的工作更轻松</h1>
 
         {/* Main input */}
         <div style={{ ...styles.inputBox, ...(focused ? styles.inputBoxFocused : {}) }}>
@@ -161,6 +161,11 @@ export default function HomePage({ settings, onStartTask }: Props) {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Copyright footer */}
+      <div style={styles.footer}>
+        © 2026 MiniMax
       </div>
     </div>
   )
@@ -442,5 +447,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 14px',
     fontSize: 13, fontWeight: 500, color: '#333',
     background: '#fff',
+  },
+  footer: {
+    textAlign: 'center', fontSize: 12, color: '#ccc',
+    padding: '16px 0 20px', flexShrink: 0,
   },
 }

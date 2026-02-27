@@ -19,7 +19,6 @@ export default function Sidebar({ conversations, activeId, settings, onHome, onS
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
-  // 点击外部关闭菜单
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -111,7 +110,7 @@ export default function Sidebar({ conversations, activeId, settings, onHome, onS
 
       <div style={{ flex: 1 }} />
 
-      {/* User profile - centered horizontally */}
+      {/* User profile */}
       <div style={styles.userSection}>
         <div style={styles.userRowWrapper} ref={userMenuRef}>
           <div
@@ -131,33 +130,70 @@ export default function Sidebar({ conversations, activeId, settings, onHome, onS
           {/* Floating user menu */}
           {userMenuOpen && (
             <div style={styles.userMenu}>
-              <div style={styles.menuHeader}>
-                <span style={{ fontWeight: 500 }}>个人</span>
+              {/* Top: avatar + name + UID */}
+              <div style={styles.menuTopSection}>
+                <div style={styles.menuAvatar}>
+                  {settings.userName.charAt(0)}
+                </div>
+                <div style={styles.menuUserInfo}>
+                  <div style={styles.menuUserName}>{settings.userName}</div>
+                  <div style={styles.menuUid}>483229324081983496</div>
+                </div>
+              </div>
+
+              {/* 个人 header + 升级 */}
+              <div style={styles.menuPersonalRow}>
+                <span style={styles.menuPersonalLabel}>个人</span>
                 <button style={styles.upgradeBtn}>升级</button>
               </div>
-              
+
+              <div style={styles.menuDivider} />
+
+              {/* 积分 */}
+              <div style={styles.menuItem}>
+                <CoinIcon />
+                <span style={{ flex: 1 }}>积分</span>
+                <span style={styles.pointsValue}>1177</span>
+                <ChevronIcon rotated={false} style={{ transform: 'rotate(-90deg)', width: 10, height: 10 }} />
+              </div>
+
+              {/* Supabase 集成 */}
+              <div style={styles.menuItem}>
+                <LightningMenuIcon />
+                <span>Supabase 集成</span>
+              </div>
+
+              {/* 定时任务 */}
+              <div style={styles.menuItem}>
+                <ClockMenuIcon />
+                <span>定时任务</span>
+              </div>
+
+              {/* 设置 */}
               <div style={styles.menuItem} onClick={() => { setUserMenuOpen(false); onSettings() }}>
                 <SettingsIcon />
                 <span>设置</span>
               </div>
-              
+
+              <div style={styles.menuDivider} />
+
               <div style={styles.menuItem}>
                 <ContactIcon />
-                <span>联系我们</span>
-                <ChevronIcon rotated={false} style={{ transform: 'rotate(-90deg)', marginLeft: 'auto', width: 10, height: 10 }} />
+                <span style={{ flex: 1 }}>联系我们</span>
+                <ChevronIcon rotated={false} style={{ transform: 'rotate(-90deg)', width: 10, height: 10 }} />
               </div>
-              
+
               <div style={styles.menuItem}>
                 <InfoIcon />
-                <span>了解更多</span>
-                <ChevronIcon rotated={false} style={{ transform: 'rotate(-90deg)', marginLeft: 'auto', width: 10, height: 10 }} />
+                <span style={{ flex: 1 }}>了解更多</span>
+                <ChevronIcon rotated={false} style={{ transform: 'rotate(-90deg)', width: 10, height: 10 }} />
               </div>
-              
+
               <div style={styles.menuDivider} />
-              
-              <div style={styles.menuItem} onClick={() => setUserMenuOpen(false)}>
+
+              <div style={{ ...styles.menuItem, ...styles.menuItemDanger }} onClick={() => setUserMenuOpen(false)}>
                 <LogoutIcon />
-                <span style={{ color: '#ff4444' }}>退出登录</span>
+                <span>退出登录</span>
               </div>
             </div>
           )}
@@ -167,7 +203,7 @@ export default function Sidebar({ conversations, activeId, settings, onHome, onS
   )
 }
 
-// Icons
+// ─── Icons ────────────────────────────────────────────────────────────────────
 function LogoIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -273,6 +309,33 @@ function LogoutIcon() {
   )
 }
 
+function CoinIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="#f59e0b" strokeWidth="1.3" />
+      <text x="8" y="11.5" fontSize="7" fill="#f59e0b" textAnchor="middle" fontWeight="bold">M</text>
+    </svg>
+  )
+}
+
+function LightningMenuIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <polygon points="9 2 3 9 8 9 7 14 13 7 8 7 9 2" fill="#a855f7" />
+    </svg>
+  )
+}
+
+function ClockMenuIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="#666" strokeWidth="1.2" />
+      <path d="M8 4.5v3.5l2.5 1.5" stroke="#666" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
   sidebar: {
     width: 240,
@@ -281,12 +344,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     flexShrink: 0,
-    padding: '0 0 0 0',
   },
   topRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '14px 14px 10px',
   },
   logoBtn: {
@@ -298,183 +358,126 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6, display: 'flex', alignItems: 'center',
     transition: 'background 0.1s',
   },
-  navSection: {
-    padding: '0 8px',
-    marginBottom: 4,
-  },
+  navSection: { padding: '0 8px', marginBottom: 4 },
   navBtn: {
-    width: '100%', background: 'none', border: 'none',
-    cursor: 'pointer', padding: '8px 10px',
-    borderRadius: 8, fontSize: 13.5, color: '#333',
+    width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+    padding: '8px 10px', borderRadius: 8, fontSize: 13.5, color: '#333',
     display: 'flex', alignItems: 'center', gap: 10,
-    textAlign: 'left', fontFamily: 'inherit',
-    transition: 'background 0.1s',
+    textAlign: 'left', fontFamily: 'inherit', transition: 'background 0.1s',
   },
   sectionHeader: {
     fontSize: 11, color: '#aaa', fontWeight: 500,
-    padding: '10px 18px 4px',
-    letterSpacing: '0.03em',
+    padding: '10px 18px 4px', letterSpacing: '0.03em',
   },
   newBadge: {
-    marginLeft: 'auto',
-    fontSize: 10, fontWeight: 600,
+    marginLeft: 'auto', fontSize: 10, fontWeight: 600,
     background: 'linear-gradient(135deg, #667eea, #764ba2)',
     color: 'white', padding: '1px 6px', borderRadius: 10,
   },
   collapsibleHeader: {
-    width: '100%', background: 'none', border: 'none',
-    cursor: 'pointer', padding: '8px 18px',
-    fontSize: 12, color: '#888', fontFamily: 'inherit',
+    width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+    padding: '8px 18px', fontSize: 12, color: '#888', fontFamily: 'inherit',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     transition: 'color 0.1s',
   },
-  taskList: {
-    padding: '2px 8px',
-    overflowY: 'auto',
-    maxHeight: 280,
-  },
-  emptyText: {
-    fontSize: 12, color: '#bbb', padding: '8px 12px',
-  },
+  taskList: { padding: '2px 8px', overflowY: 'auto', maxHeight: 280 },
+  emptyText: { fontSize: 12, color: '#bbb', padding: '8px 12px' },
   taskItem: {
     display: 'flex', alignItems: 'center', gap: 8,
     padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
-    fontSize: 13, color: '#555',
-    transition: 'background 0.1s',
+    fontSize: 13, color: '#555', transition: 'background 0.1s',
   },
-  taskItemActive: {
-    background: '#f0f0f0',
-    color: '#1a1a1a',
-  },
-  taskItemHover: {
-    background: '#f5f5f5',
-  },
+  taskItemActive: { background: '#f0f0f0', color: '#1a1a1a' },
+  taskItemHover: { background: '#f5f5f5' },
   taskTitle: {
     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     fontSize: 12.5,
   },
   deleteBtn: {
-    background: 'none', border: 'none', color: '#ccc',
-    cursor: 'pointer', fontSize: 16, padding: '0 2px',
-    opacity: 0, transition: 'opacity 0.1s',
-    lineHeight: 1,
+    background: 'none', border: 'none', color: '#ccc', cursor: 'pointer',
+    fontSize: 16, padding: '0 2px', opacity: 0, transition: 'opacity 0.1s', lineHeight: 1,
   },
   userSection: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: '12px 0',
-    borderTop: '1px solid #efefef',
+    display: 'flex', justifyContent: 'center',
+    padding: '12px 0', borderTop: '1px solid #efefef',
   },
-  userRowWrapper: {
-    position: 'relative',
-  },
+  userRowWrapper: { position: 'relative' },
   userRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '8px 12px',
-    borderRadius: 8,
-    cursor: 'pointer',
-    transition: 'background 0.1s',
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '8px 12px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s',
   },
   userAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: '50%',
+    width: 36, height: 36, borderRadius: '50%',
     background: 'linear-gradient(135deg, #667eea, #764ba2)',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 15,
-    fontWeight: 600,
-    flexShrink: 0,
+    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 15, fontWeight: 600, flexShrink: 0,
   },
-  userTextSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-    overflow: 'hidden',
-  },
+  userTextSection: { display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' },
   userRowName: {
-    fontSize: 13.5,
-    fontWeight: 500,
-    color: '#333',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    fontSize: 13.5, fontWeight: 500, color: '#333',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
-  userRowPlan: {
-    fontSize: 11,
-    color: '#999',
-  },
+  userRowPlan: { fontSize: 11, color: '#999' },
+  // ── User menu ──────────────────────────────────────────────────────────────
   userMenu: {
-    position: 'absolute',
-    bottom: '100%',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    marginBottom: 8,
-    width: 240,
-    background: '#ffffff',
-    borderRadius: 12,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
-    overflow: 'hidden',
-    zIndex: 1000,
-    animation: 'slideIn 0.2s ease-out',
+    position: 'absolute', bottom: '100%', left: '50%',
+    transform: 'translateX(-50%)', marginBottom: 8,
+    width: 256, background: '#ffffff', borderRadius: 14,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.06)',
+    overflow: 'hidden', zIndex: 1000,
+    animation: 'menuSlide 0.18s ease-out',
   },
-  menuHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 16px',
+  menuTopSection: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '14px 16px 10px', background: '#fafafa',
     borderBottom: '1px solid #f0f0f0',
-    background: '#fafafa',
   },
+  menuAvatar: {
+    width: 38, height: 38, borderRadius: '50%',
+    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 16, fontWeight: 600, flexShrink: 0,
+  },
+  menuUserInfo: { flex: 1, minWidth: 0 },
+  menuUserName: {
+    fontSize: 13.5, fontWeight: 600, color: '#1a1a1a',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  menuUid: {
+    fontSize: 10.5, color: '#bbb', fontFamily: 'monospace',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2,
+  },
+  menuPersonalRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '10px 16px 8px',
+  },
+  menuPersonalLabel: { fontSize: 12, color: '#999', fontWeight: 500 },
   upgradeBtn: {
-    background: '#1a1a1a',
-    color: 'white',
-    border: 'none',
-    borderRadius: 16,
-    padding: '4px 12px',
-    fontSize: 12,
-    fontWeight: 500,
-    cursor: 'pointer',
+    background: '#1a1a1a', color: 'white', border: 'none',
+    borderRadius: 16, padding: '4px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer',
   },
   menuItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '12px 16px',
-    cursor: 'pointer',
-    fontSize: 13.5,
-    color: '#333',
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '11px 16px', cursor: 'pointer', fontSize: 13.5, color: '#333',
     transition: 'background 0.1s',
   },
-  menuDivider: {
-    height: 1,
-    background: '#f0f0f0',
-    margin: '4px 0',
-  },
+  menuItemDanger: { color: '#ff4444' },
+  menuDivider: { height: 1, background: '#f0f0f0', margin: '3px 0' },
+  pointsValue: { fontSize: 13.5, color: '#1a1a1a', fontWeight: 500, marginRight: 2 },
 }
 
-// Add animation styles
+// Inject menu animation once
 if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style')
-  styleElement.id = 'user-menu-animation'
-  styleElement.textContent = `
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(8px);
+  const id = 'sidebar-menu-animation'
+  if (!document.getElementById(id)) {
+    const el = document.createElement('style')
+    el.id = id
+    el.textContent = `
+      @keyframes menuSlide {
+        from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+        to   { opacity: 1; transform: translateX(-50%) translateY(0); }
       }
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
-  `
-  const existing = document.getElementById('user-menu-animation')
-  if (!existing) {
-    document.head.appendChild(styleElement)
+    `
+    document.head.appendChild(el)
   }
 }
