@@ -29,6 +29,11 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
   const [statusText, setStatusText] = useState('')
   const [isSmartMode, setIsSmartMode] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [rightPanel, setRightPanel] = useState<
+    | null
+    | { mode: 'tool'; event: ToolEvent }
+    | { mode: 'files'; events: ToolEvent[] }
+  >(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
 
@@ -153,7 +158,13 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
     <div style={styles.chatColumn}>
       <div style={styles.messages}>
         {messages.map((msg, i) => (
-          <MessageBubble key={i} message={msg} />
+          <MessageBubble
+            key={i}
+            message={msg}
+            selectedToolId={rightPanel?.mode === 'tool' ? rightPanel.event.id : null}
+            onSelectTool={event => { setRightPanel({ mode: 'tool', event }); setShowPreview(false) }}
+            onShowFiles={events => { setRightPanel({ mode: 'files', events }); setShowPreview(false) }}
+          />
         ))}
         {isRunning && statusText && (
           <div style={styles.statusRow}>
@@ -244,16 +255,24 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
 
   return (
     <div style={styles.page}>
-      {showPreview ? (
+      {(rightPanel !== null || showPreview) ? (
         <SplitPane
           left={chatColumn}
-          right={(
-            <PreviewPanel
-              messages={messages}
-              workspace={settings.workspace || ''}
-              onClose={() => setShowPreview(false)}
-            />
-          )}
+          right={
+            rightPanel !== null ? (
+              <ToolDetailPanel
+                panel={rightPanel}
+                onClose={() => setRightPanel(null)}
+                onSelectTool={event => setRightPanel({ mode: 'tool', event })}
+              />
+            ) : (
+              <PreviewPanel
+                messages={messages}
+                workspace={settings.workspace || ''}
+                onClose={() => setShowPreview(false)}
+              />
+            )
+          }
           defaultLeftPercent={62}
           minLeft={320}
           minRight={280}
@@ -264,8 +283,52 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
     </div>
   )
 }
+// ─── Tool helpers ─────────────────────────────────────────────────────────────
+const TOOL_NAMES: Record<string, string> = {
+  execute_shell: '命令行执行',
+  read_file: '读取文件',
+  write_file: '写入文件',
+  list_files: '列出文件',
+  search_files: '搜索文件',
+  create_directory: '创建目录',
+  move_file: '移动文件',
+  delete_file: '删除文件',
+}
+
+const FILE_TOOLS = new Set(['read_file', 'write_file', 'list_files', 'search_files', 'create_directory', 'move_file', 'delete_file'])
+
+function getToolSummary(event: ToolEvent): string {
+  const { name, input } = event
+  switch (name) {
+    case 'execute_shell': return (input.command as string) || ''
+    case 'read_file':
+    case 'write_file':
+    case 'list_files':
+    case 'create_directory':
+    case 'delete_file': return (input.path as string) || ''
+    case 'search_files': return (input.directory as string) || (input.path as string) || ''
+    case 'move_file': return `${input.source} → ${input.destination}`
+    default: return ''
+  }
+}
+
+function getResultText(result?: Record<string, unknown>): string {
+  if (!result) return ''
+  if (typeof result.output === 'string') return result.output
+  if (typeof result.stdout === 'string') return result.stdout
+  if (typeof result.content === 'string') return result.content
+  if (typeof result.result === 'string') return result.result
+  if (typeof result.error === 'string') return result.error
+  return JSON.stringify(result, null, 2)
+}
+
 // ─── Message bubble ───────────────────────────────────────────────────────────
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, selectedToolId, onSelectTool, onShowFiles }: {
+  message: Message
+  selectedToolId: string | null
+  onSelectTool: (event: ToolEvent) => void
+  onShowFiles: (events: ToolEvent[]) => void
+}) {
   if (message.role === 'user') {
     return (
       <div style={msgStyles.userRow}>
@@ -275,11 +338,35 @@ function MessageBubble({ message }: { message: Message }) {
       </div>
     )
   }
+
+  const fileEvents = (message.events ?? []).filter(
+    e => e.type === 'tool_result' && FILE_TOOLS.has(e.name)
+  )
+  const showFilesBtn = fileEvents.length > 0 && !message.streaming
+
   return (
     <div style={msgStyles.assistantRow}>
       <div style={msgStyles.avatar}><AvatarIcon /></div>
       <div style={msgStyles.assistantContent}>
-        {message.events?.map((ev, i) => <ToolBlock key={i} event={ev} />)}
+        {message.events?.map((ev, i) => (
+          <ToolBlock
+            key={i}
+            event={ev}
+            isSelected={selectedToolId === ev.id}
+            onSelect={onSelectTool}
+          />
+        ))}
+        {showFilesBtn && (
+          <button
+            style={toolStyles.filesBtn}
+            onClick={() => onShowFiles(fileEvents)}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M2 4a1 1 0 011-1h3.5l1.5 2H13a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+            </svg>
+            <span>查看此任务中的所有文件 ({fileEvents.length})</span>
+          </button>
+        )}
         {message.content && (
           <div style={msgStyles.text}>
             <SimpleMarkdown text={message.content} />
@@ -291,31 +378,144 @@ function MessageBubble({ message }: { message: Message }) {
   )
 }
 
-function ToolBlock({ event }: { event: ToolEvent }) {
-  const [open, setOpen] = useState(false)
+function ToolBlock({ event, isSelected, onSelect }: {
+  event: ToolEvent
+  isSelected: boolean
+  onSelect: (event: ToolEvent) => void
+}) {
   const isDone = event.type === 'tool_result'
-  const color = '#888'
+  const isError = !!event.isError
+  const toolName = TOOL_NAMES[event.name] || event.name
+  const summary = getToolSummary(event)
+
+  const accentColor = isSelected
+    ? '#0094fc'
+    : isDone
+      ? isError ? '#f5222d' : '#52c41a'
+      : '#999'
 
   return (
-    <div style={toolStyles.block}>
-      <button style={{ ...toolStyles.header, borderLeftColor: color }} onClick={() => setOpen(p => !p)}>
-        <span style={toolStyles.icon}>🔧</span>
-        <span style={{ ...toolStyles.name, color }}>{event.name}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {isDone && !event.isError && <CheckMark color={color} />}
-          <MiniChevron open={open} />
+    <button
+      style={{
+        ...toolStyles.block,
+        borderLeftColor: accentColor,
+        background: isSelected ? 'rgba(0,148,252,0.06)' : 'var(--bg-secondary)',
+      }}
+      onClick={() => onSelect(event)}
+    >
+      <span style={toolStyles.statusIcon}>
+        {isDone
+          ? isError ? <ErrorDot /> : <SuccessDot />
+          : <RunningDot />
+        }
+      </span>
+      <span style={{ ...toolStyles.statusLabel, color: isDone ? (isError ? '#f5222d' : '#52c41a') : '#999' }}>
+        {isDone ? (isError ? '失败' : '已完成') : '执行中'}
+      </span>
+      <span style={toolStyles.toolName}>{toolName}</span>
+      {summary && (
+        <span style={toolStyles.summary}>{summary}</span>
+      )}
+      <span style={{ flex: 1 }} />
+      {isDone && event.duration !== undefined && (
+        <span style={toolStyles.duration}>
+          {event.duration < 1000 ? `${event.duration}ms` : `${(event.duration / 1000).toFixed(1)}s`}
+        </span>
+      )}
+      <span style={toolStyles.arrow}>›</span>
+    </button>
+  )
+}
+
+// ─── Tool detail panel ────────────────────────────────────────────────────────
+function ToolDetailPanel({ panel, onClose, onSelectTool }: {
+  panel: { mode: 'tool'; event: ToolEvent } | { mode: 'files'; events: ToolEvent[] }
+  onClose: () => void
+  onSelectTool: (event: ToolEvent) => void
+}) {
+  if (panel.mode === 'files') {
+    return (
+      <div style={detailStyles.panel}>
+        <div style={detailStyles.header}>
+          <span style={detailStyles.headerTitle}>任务文件</span>
+          <button style={detailStyles.closeBtn} onClick={onClose}>×</button>
         </div>
-      </button>
-      {open && (
-        <div style={toolStyles.body}>
-          {event.input && (
-            <div style={toolStyles.section}>
-              <span style={toolStyles.sectionLabel}>INPUT</span>
-              <pre style={toolStyles.code}>{JSON.stringify(event.input, null, 2)}</pre>
-            </div>
+        <div style={detailStyles.body}>
+          {panel.events.map((ev, i) => {
+            const path = getToolSummary(ev)
+            const tag = TOOL_NAMES[ev.name] || ev.name
+            return (
+              <button key={i} style={detailStyles.fileItem} onClick={() => onSelectTool(ev)}>
+                <span style={detailStyles.fileIcon}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                    <path d="M10 2v4h4" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+                <span style={detailStyles.filePath}>{path || ev.name}</span>
+                <span style={detailStyles.fileTag}>{tag}</span>
+                <span style={detailStyles.fileArrow}>›</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const { event } = panel
+  const isDone = event.type === 'tool_result'
+  const isShell = event.name === 'execute_shell'
+  const toolName = TOOL_NAMES[event.name] || event.name
+  const summary = getToolSummary(event)
+  const resultText = getResultText(event.result)
+
+  return (
+    <div style={detailStyles.panel}>
+      <div style={detailStyles.header}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={detailStyles.headerTitle}>{toolName}</span>
+          {isDone && event.duration !== undefined && (
+            <span style={detailStyles.headerDuration}>
+              {event.duration < 1000 ? `${event.duration}ms` : `${(event.duration / 1000).toFixed(1)}s`}
+            </span>
+          )}
+          {isDone && (
+            <span style={{ ...detailStyles.headerBadge, background: event.isError ? '#fff1f0' : '#f6ffed', color: event.isError ? '#f5222d' : '#52c41a', border: `1px solid ${event.isError ? '#ffa39e' : '#b7eb8f'}` }}>
+              {event.isError ? '失败' : '已完成'}
+            </span>
           )}
         </div>
-      )}
+        <button style={detailStyles.closeBtn} onClick={onClose}>×</button>
+      </div>
+      <div style={detailStyles.body}>
+        <div style={detailStyles.section}>
+          <div style={detailStyles.sectionLabel}>{isShell ? '命令' : '路径'}</div>
+          <pre style={{ ...detailStyles.code, ...(isShell ? detailStyles.terminal : {}) }}>
+            {isShell ? `$ ${summary}` : summary}
+          </pre>
+        </div>
+        {!isShell && event.input.content != null && (
+          <div style={detailStyles.section}>
+            <div style={detailStyles.sectionLabel}>写入内容</div>
+            <pre style={detailStyles.code}>{String(event.input.content)}</pre>
+          </div>
+        )}
+        {isDone && (
+          <div style={detailStyles.section}>
+            <div style={detailStyles.sectionLabel}>
+              {isShell ? '输出' : event.isError ? '错误信息' : '结果'}
+            </div>
+            <pre style={{
+              ...detailStyles.code,
+              ...(isShell ? detailStyles.terminal : {}),
+              ...(event.isError ? { color: '#f5222d' } : {}),
+            }}>
+              {resultText || '(无输出)'}
+            </pre>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -369,18 +569,48 @@ function CheckMark({ color }: { color: string }) {
 
 function MiniChevron({ open }: { open: boolean }) {
   return (
-    <svg 
-      width="12" 
-      height="12" 
-      viewBox="0 0 12 12" 
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
       fill="none"
-      style={{ 
+      style={{
         transform: `rotate(${open ? '180deg' : '0deg'}`,
         transition: 'transform 0.2s ease',
       }}
     >
       <path d="M3 4L6 7L9 4" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  )
+}
+
+function SuccessDot() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+      <circle cx="5" cy="5" r="5" fill="#52c41a" />
+      <path d="M2.5 5L4 6.5L7.5 3.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ErrorDot() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+      <circle cx="5" cy="5" r="5" fill="#f5222d" />
+      <path d="M3.5 3.5L6.5 6.5M6.5 3.5L3.5 6.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function RunningDot() {
+  return (
+    <span style={{
+      display: 'inline-block',
+      width: 8, height: 8,
+      borderRadius: '50%',
+      background: '#999',
+      animation: 'pulse 1.2s ease-in-out infinite',
+    }} />
   )
 }
 
@@ -529,14 +759,44 @@ const msgStyles: Record<string, React.CSSProperties> = {
 }
 
 const toolStyles: Record<string, React.CSSProperties> = {
-  block: { marginBottom: 6, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-light)', background: 'var(--bg-secondary)' },
-  header: { width: '100%', background: 'none', border: 'none', borderLeft: '3px solid var(--text-tertiary)', cursor: 'pointer', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 7 },
-  icon: { fontSize: 12, flexShrink: 0 },
-  name: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 500, flexShrink: 0 },
-  body: { padding: '0 10px 10px', borderTop: '1px solid var(--border-light)' },
-  section: { marginTop: 8 },
-  sectionLabel: { fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '0.1em', fontFamily: "'IBM Plex Mono', monospace", display: 'block', marginBottom: 4 },
-  code: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, maxHeight: 180, overflow: 'auto', background: 'var(--bg-tertiary)', padding: '8px 10px', borderRadius: 6 },
+  block: {
+    width: '100%', marginBottom: 4,
+    borderRadius: 7, border: '1px solid var(--border-light)', borderLeft: '3px solid #999',
+    background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', gap: 6,
+    padding: '7px 10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+    transition: 'background 0.15s',
+  },
+  statusIcon: { flexShrink: 0, display: 'flex', alignItems: 'center' },
+  statusLabel: { fontSize: 11, fontWeight: 500, flexShrink: 0 },
+  toolName: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: 'var(--text-primary)', flexShrink: 0 },
+  summary: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280, minWidth: 0 },
+  duration: { fontSize: 11, color: 'var(--text-tertiary)', flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" },
+  arrow: { fontSize: 16, color: 'var(--text-tertiary)', flexShrink: 0, lineHeight: 1 },
+  filesBtn: {
+    display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 6,
+    padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-light)',
+    borderRadius: 6, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)',
+    fontFamily: 'inherit', transition: 'color 0.15s, border-color 0.15s',
+  },
+}
+
+const detailStyles: Record<string, React.CSSProperties> = {
+  panel: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-light)', overflow: 'hidden' },
+  header: { display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid var(--border-light)', gap: 8, flexShrink: 0 },
+  headerTitle: { fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' },
+  headerDuration: { fontSize: 12, color: 'var(--text-tertiary)', fontFamily: "'IBM Plex Mono', monospace" },
+  headerBadge: { fontSize: 11, fontWeight: 500, padding: '1px 7px', borderRadius: 10 },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: '2px 6px', borderRadius: 4, flexShrink: 0, marginLeft: 'auto' },
+  body: { flex: 1, overflowY: 'auto', padding: '16px' },
+  section: { marginBottom: 16 },
+  sectionLabel: { fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace", display: 'block' },
+  code: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, background: 'var(--bg-secondary)', padding: '10px 12px', borderRadius: 6, overflowX: 'auto' as const, overflowY: 'auto' as const, maxHeight: 380, whiteSpace: 'pre-wrap' as const, wordBreak: 'break-all' as const, margin: 0 },
+  terminal: { background: '#1a1a1a', color: '#e8e8e8' },
+  fileItem: { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', marginBottom: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 8, cursor: 'pointer', textAlign: 'left' as const, fontFamily: 'inherit', transition: 'background 0.15s' },
+  fileIcon: { fontSize: 14, flexShrink: 0, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center' },
+  filePath: { flex: 1, fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, minWidth: 0 },
+  fileTag: { fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: 4, flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" },
+  fileArrow: { fontSize: 16, color: 'var(--text-tertiary)', flexShrink: 0, lineHeight: 1 },
 }
 
 const mdStyles: Record<string, React.CSSProperties> = {
