@@ -181,94 +181,107 @@ export default function SettingsModal({ initial, onSave, onClose }: Props) {
 
       case 'desktop-general':
         return (
-          <div style={styles.tabContent}>
-            <Field label="菜单栏显示">
-              <div style={styles.horizontalField}>
-                <span style={styles.fieldDesc}>在菜单栏中显示 {appConfig.appName}</span>
+          <div style={{ ...styles.tabContent, maxWidth: '100%' }}>
+            {/* 菜单栏 */}
+            <DesktopRow
+              label="菜单栏"
+              desc={`在菜单栏中显示 ${appConfig.appName}`}
+              control={
                 <label className="switch">
                   <input type="checkbox" checked={form.showInMenuBar ?? true} onChange={e => set('showInMenuBar', e.target.checked)} />
                   <span className="slider"></span>
                 </label>
-              </div>
-            </Field>
+              }
+            />
 
-            <Field label="开机自动启动">
-              <div style={styles.horizontalField}>
-                <span style={styles.fieldDesc}>登录计算机时自动启动 {appConfig.appName}</span>
+            {/* 开机自动 */}
+            <DesktopRow
+              label="开机自动"
+              desc={`登录计算机时自动启动 ${appConfig.appName}`}
+              control={
                 <label className="switch">
                   <input type="checkbox" checked={form.autoStart ?? false} onChange={e => set('autoStart', e.target.checked)} />
                   <span className="slider"></span>
                 </label>
-              </div>
-            </Field>
+              }
+            />
 
-            <Field label="快捷键唤起小窗" hint="在桌面任意位置唤醒 MiniMax Agent">
-              <div style={styles.shortcutWrapper}>
-                <input
-                  type="text"
-                  style={styles.shortcutField}
-                  value={shortcutInput}
-                  onChange={e => {
-                    const val = e.target.value
-                    setShortcutInput(val)
-                    if (val.trim()) {
-                      set('shortcut', val)
-                    }
-                  }}
-                  onKeyDown={e => {
-                    e.preventDefault()
-                    const keys: string[] = []
-                    if (e.ctrlKey) keys.push('Ctrl')
-                    if (e.altKey) keys.push('Alt')
-                    if (e.shiftKey) keys.push('Shift')
-                    if (e.metaKey) keys.push('Win')
-                    const key = e.key
-                    if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
-                      keys.push(key)
-                    }
-                    const shortcut = keys.join('+')
-                    setShortcutInput(shortcut)
-                    set('shortcut', shortcut)
-                  }}
-                  placeholder="输入快捷键"
-                />
-                {shortcutInput && (
-                  <button style={styles.clearBtn} onClick={() => {
-                    setShortcutInput('')
-                    set('shortcut', '')
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </Field>
+            {/* 快捷键唤起小窗 */}
+            <DesktopRow
+              label="快捷键唤起小窗"
+              desc="在桌面任意位置唤醒 MiniMax Agent"
+              control={
+                <div style={styles.shortcutWrapper}>
+                  <input
+                    type="text"
+                    style={styles.shortcutFieldInline}
+                    value={shortcutInput}
+                    readOnly
+                    onKeyDown={e => {
+                      e.preventDefault()
+                      const keys: string[] = []
+                      if (e.ctrlKey) keys.push('Ctrl')
+                      if (e.altKey) keys.push('Alt')
+                      if (e.shiftKey) keys.push('Shift')
+                      if (e.metaKey) keys.push('Win')
+                      const key = e.key
+                      if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
+                        keys.push(key)
+                      }
+                      const shortcut = keys.join('+')
+                      setShortcutInput(shortcut)
+                      set('shortcut', shortcut)
+                    }}
+                    placeholder="输入快捷键"
+                  />
+                  {shortcutInput && (
+                    <button style={styles.clearBtnInline} onClick={() => {
+                      setShortcutInput('')
+                      set('shortcut', '')
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              }
+            />
 
-            <Field label="命令白名单" hint="允许自动运行的命令">
-              <button style={styles.editBtn}>编辑</button>
-            </Field>
+            {/* 工作区路径 */}
+            <DesktopRow
+              label="工作区路径"
+              desc={form.workspace || '未设置'}
+              control={
+                <button style={styles.editBtn} onClick={pickFolder}>更改</button>
+              }
+            />
 
-            <Field label="文件夹访问权限" hint="已授予读写权限的文件夹">
-              <button style={styles.editBtn}>编辑</button>
-            </Field>
+            {/* 命令白名单 */}
+            <DesktopRow
+              label="命令白名单"
+              desc="允许自动运行的命令"
+              control={<button style={styles.editBtn}>编辑</button>}
+            />
 
-            <Field label="语言">
-              <select style={styles.select} value={form.language || 'zh-CN'} onChange={e => set('language', e.target.value)}>
-                <option value="zh-CN">简体中文</option>
-                <option value="en">English</option>
-              </select>
-            </Field>
+            {/* 文件夹访问权限 */}
+            <DesktopRow
+              label="文件夹访问权限"
+              desc="已授予读写权限的文件夹"
+              control={<button style={styles.editBtn}>编辑</button>}
+            />
 
-            <Field label="启动时自动打开新任务">
-              <div style={styles.horizontalField}>
-                <span style={styles.fieldDesc}>启用</span>
-                <label className="switch">
-                  <input type="checkbox" checked={form.autoOpenTask ?? true} onChange={e => set('autoOpenTask', e.target.checked)} />
-                  <span className="slider"></span>
-                </label>
-              </div>
-            </Field>
+            {/* 语言 */}
+            <DesktopRow
+              label="语言"
+              control={
+                <select style={styles.selectInline} value={form.language || 'zh-CN'} onChange={e => set('language', e.target.value)}>
+                  <option value="zh-CN">中文</option>
+                  <option value="en">English</option>
+                </select>
+              }
+              last
+            />
           </div>
         )
 
@@ -423,6 +436,22 @@ function NavItem({ active, onClick, icon, children }: { active: boolean; onClick
     >
       {icon}
       <span style={styles.navItemText}>{children}</span>
+    </div>
+  )
+}
+
+function DesktopRow({ label, desc, control, last }: { label: string; desc?: string; control: React.ReactNode; last?: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '16px 0',
+      borderBottom: last ? 'none' : '1px solid var(--border-light)',
+    }}>
+      <div style={{ flex: 1, marginRight: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: desc ? 3 : 0 }}>{label}</div>
+        {desc && <div style={{ fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{desc}</div>}
+      </div>
+      <div style={{ flexShrink: 0 }}>{control}</div>
     </div>
   )
 }
@@ -742,14 +771,48 @@ const styles: Record<string, React.CSSProperties> = {
   },
   editBtn: {
     border: '1px solid var(--border-medium)',
-    background: 'var(--bg-secondary)',
+    background: 'var(--bg-primary)',
     borderRadius: 8,
-    padding: '8px 16px',
+    padding: '6px 16px',
     cursor: 'pointer',
-    fontSize: 12.5,
+    fontSize: 13,
     color: 'var(--text-secondary)',
     fontFamily: 'inherit',
     transition: 'all 0.15s',
+    whiteSpace: 'nowrap' as const,
+  },
+  shortcutFieldInline: {
+    width: 100,
+    border: '1px solid var(--border-medium)',
+    borderRadius: 8,
+    padding: '6px 10px',
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    outline: 'none',
+    fontFamily: 'inherit',
+    background: 'var(--bg-primary)',
+    textAlign: 'center' as const,
+  },
+  clearBtnInline: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 24, height: 24,
+    border: 'none',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-tertiary)',
+    cursor: 'pointer',
+    borderRadius: '50%',
+    flexShrink: 0,
+  },
+  selectInline: {
+    border: '1px solid var(--border-medium)',
+    borderRadius: 8,
+    padding: '6px 10px',
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    outline: 'none',
+    background: 'var(--bg-primary)',
+    fontFamily: 'inherit',
+    minWidth: 90,
   },
   horizontalField: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
