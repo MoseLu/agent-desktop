@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import type { Settings, Conversation, Message, Tab, AppMode } from '@types'
+import type { Settings, Conversation, Tab, AppMode } from '@types'
 import { ThemeProvider, useTheme } from '@contexts/ThemeProvider'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
@@ -224,7 +224,7 @@ function AppContent() {
   }, [tabs, createNewTab])
 
   // 只有当用户输入了内容时才创建新任务
-  const startNewTask = useCallback((initialPrompt?: string) => {
+  const startNewTask = useCallback((initialPrompt?: string, smartMode?: boolean) => {
     // 如果没有初始提示，不创建任务（从 HomePage 的输入框提交时会传递内容）
     if (!initialPrompt || !initialPrompt.trim()) {
       return null
@@ -236,6 +236,7 @@ function AppContent() {
       title: initialPrompt.slice(0, 30),
       messages: [{ role: 'user', content: initialPrompt }],
       createdAt: new Date(),
+      smartMode: smartMode ?? false,
     }
     setConversations(prev => [conv, ...prev])
     setActiveId(id)
@@ -298,33 +299,30 @@ function AppContent() {
     return result.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
   }, [conversations])
 
-  // 从当前会话创建分支会话
+  // 从当前会话创建分支会话（子会话，不新建全局 Tab，仅在 ChatPage 内的 tab 栏展示）
   const createBranch = useCallback((fromConversationId: string) => {
     const fromConv = conversations.find(c => c.id === fromConversationId)
     if (!fromConv) return
 
     const id = `branch-${Date.now()}`
-    const tabId = `tab-${Date.now() + 1}`
     const branchConv: Conversation = {
       id,
-      title: `${fromConv.title} · 分支`,
+      title: `${fromConv.title} · 子会话`,
       messages: fromConv.messages.filter(m => !m.streaming).map(m => ({ ...m })),
       createdAt: new Date(),
       parentId: fromConversationId,
-      tabId,
-    }
-    const newTab: Tab = {
-      id: tabId,
-      title: branchConv.title,
-      conversationId: id,
-      isDefault: false,
+      smartMode: fromConv.smartMode,
     }
     setConversations(prev => [...prev, branchConv])
-    setTabs(prev => [...prev, newTab])
-    setActiveTabId(tabId)
     setActiveId(id)
     setPage('chat')
   }, [conversations])
+
+  // 切换到某个子会话（不修改全局 tab，只改 activeId）
+  const switchBranch = useCallback((convId: string) => {
+    setActiveId(convId)
+    setPage('chat')
+  }, [])
 
   const deleteConv = (id: string) => {
     setConversations(prev => prev.filter(c => c.id !== id))
@@ -384,16 +382,13 @@ function AppContent() {
               onUpdate={(updater) => updateConv(activeId!, updater)}
               branchConversations={getBranchFamily(activeId!)}
               onCreateBranch={() => createBranch(activeId!)}
-              onSelectConversation={selectConversation}
+              onSwitchBranch={switchBranch}
             />
           ) : (
             <HomePage
               settings={settings}
-              onStartTask={(prompt) => {
-                const result = startNewTask(prompt)
-                if (result) {
-                  // 任务已创建并切换到聊天页面
-                }
+              onStartTask={(prompt, smartMode) => {
+                startNewTask(prompt, smartMode)
               }}
             />
           )}

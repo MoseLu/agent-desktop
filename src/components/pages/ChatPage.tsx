@@ -7,9 +7,8 @@ import ChatInputToolbar from '@ui/ChatInputToolbar'
 import {
   AttachIcon,
   FolderIcon,
-  LightningIcon,
-  GearIcon,
   SlidersIcon,
+  LightningIcon,
   OmnipotentModeIcon as OmnipotentIcon,
 } from '@ui/icons'
 import { ArrowUpOutlined } from '@ant-design/icons'
@@ -35,21 +34,18 @@ interface Props {
   onUpdate: (updater: (c: Conversation) => Partial<Conversation>) => void
   branchConversations?: Conversation[]
   onCreateBranch?: () => void
-  onSelectConversation?: (id: string) => void
+  onSwitchBranch?: (id: string) => void
 }
 
-export default function ChatPage({ conversation, settings, mode, onUpdate, branchConversations, onCreateBranch, onSelectConversation }: Props) {
+export default function ChatPage({ conversation, settings, mode, onUpdate, branchConversations, onCreateBranch, onSwitchBranch }: Props) {
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
-  const [isSmartMode, setIsSmartMode] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
   const [workspace, setWorkspace] = useState(settings.workspace || '未设置工作目录')
   const [workspaceName, setWorkspaceName] = useState('未设置工作目录')
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
-  const historyPanelRef = useRef<HTMLDivElement>(null)
-  
+
   // 更新工作目录显示
   useEffect(() => {
     if (settings.workspace) {
@@ -58,14 +54,13 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
       setWorkspaceName(parts[parts.length - 1] || settings.workspace)
     }
   }, [settings.workspace])
-  
-  // 选择工作目录
+
+  // 选择工作目录（仅首页，会话页不可修改）
   const handleSelectWorkspace = async () => {
     if (!isElectron()) return
     const newWorkspace = await window.electron.pickFolder()
     if (newWorkspace) {
       await window.electron.saveSettings({ workspace: newWorkspace })
-      // 触发工作目录变化事件
       window.dispatchEvent(new CustomEvent('workspace-changed', { detail: newWorkspace }))
     }
   }
@@ -145,22 +140,10 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
   // Code 模式（Electron）才注册 agent 事件监听器
   useEffect(() => {
     if (mode !== 'code' || !isRealElectron()) return
-
     const cleanup = window.electron.onAgentEvent(handleAgentEvent)
     cleanupRef.current = cleanup
     return () => cleanup()
   }, [handleAgentEvent, mode])
-
-  useEffect(() => {
-    if (!showHistory) return
-    const handler = (e: MouseEvent) => {
-      if (historyPanelRef.current && !historyPanelRef.current.contains(e.target as Node)) {
-        setShowHistory(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showHistory])
 
   const sendMessage = async (content = input.trim()) => {
     if (!content || isRunning) return
@@ -206,7 +189,6 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
 
     // ─── Code 模式：Electron agent loop（含工具调用） ────────────────────────
     if (!isRealElectron()) {
-      // 不应该到这里（TabBar 已禁用 Code 模式），保底提示
       onUpdate(conv => ({
         messages: [
           ...conv.messages,
@@ -229,62 +211,51 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
     }
   }
 
+  // 分支列表（包含当前会话本身）
+  const branches = branchConversations ?? []
+  const hasBranches = branches.length > 1
+
+  // 当前会话的 smartMode（从会话创建时的选择读取）
+  const isSmartMode = conversation.smartMode ?? false
+
   return (
     <div style={styles.page}>
-      {/* 聊天顶部操作栏（独立行，不遮挡消息） */}
-      <div style={styles.chatHeader}>
-        <div ref={historyPanelRef} style={styles.chatHeaderActions}>
-          <button
-            style={floatStyles.btn}
-            title="创建分支会话"
-            onClick={() => onCreateBranch?.()}
-          >
-            <PlusIcon />
-          </button>
-          <button
-            style={{ ...floatStyles.btn, ...(showHistory ? floatStyles.btnActive : {}) }}
-            title="分支历史"
-            onClick={() => setShowHistory(p => !p)}
-          >
-            <HistoryIcon />
-          </button>
-
-          {showHistory && (
-            <div style={floatStyles.panel}>
-              <div style={floatStyles.panelHeader}>分支历史</div>
-              <div style={floatStyles.list}>
-                {(branchConversations ?? []).map(conv => {
-                  const isCurrent = conv.id === conversation.id
-                  return (
-                    <button
-                      key={conv.id}
-                      style={{ ...floatStyles.item, ...(isCurrent ? floatStyles.itemActive : {}) }}
-                      onClick={() => { onSelectConversation?.(conv.id); setShowHistory(false) }}
-                    >
-                      <span style={floatStyles.itemTitle}>{conv.title}</span>
-                      <span style={floatStyles.itemMeta}>
-                        {isCurrent ? 'Current Chat' : formatRelativeTime(conv.createdAt)}
-                      </span>
-                    </button>
-                  )
-                })}
-                {(!branchConversations || branchConversations.length === 0) && (
-                  <div style={floatStyles.empty}>暂无历史记录</div>
-                )}
-              </div>
-              <div style={floatStyles.panelDivider} />
+      {/* ── 子会话 Tab 栏（有分支时展示） ── */}
+      {hasBranches && (
+        <div style={branchTabStyles.bar}>
+          {branches.map(conv => {
+            const isCurrent = conv.id === conversation.id
+            return (
               <button
-                style={floatStyles.createBtn}
-                onClick={() => { onCreateBranch?.(); setShowHistory(false) }}
+                key={conv.id}
+                style={{
+                  ...branchTabStyles.tab,
+                  ...(isCurrent ? branchTabStyles.tabActive : {}),
+                }}
+                onClick={() => {
+                  if (!isCurrent) onSwitchBranch?.(conv.id)
+                }}
+                title={conv.title}
               >
-                <PlusIcon size={12} />
-                <span>创建分支会话</span>
+                <span style={branchTabStyles.tabTitle}>{conv.title}</span>
+                {!isCurrent && (
+                  <span style={branchTabStyles.tabMeta}>{formatRelativeTime(conv.createdAt)}</span>
+                )}
               </button>
-            </div>
-          )}
+            )
+          })}
+          {/* 新建分支按钮 */}
+          <button
+            style={branchTabStyles.newBtn}
+            onClick={() => onCreateBranch?.()}
+            title="创建子会话"
+          >
+            <PlusIcon size={12} />
+          </button>
         </div>
-      </div>
+      )}
 
+      {/* ── 消息流 ── */}
       <div style={styles.messages}>
         {messages.map((msg, i) => (
           <MessageBubble key={i} message={msg} />
@@ -298,6 +269,7 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
         <div ref={bottomRef} />
       </div>
 
+      {/* ── 输入区域 ── */}
       <div style={styles.inputArea}>
         <ChatInput
           value={input}
@@ -307,70 +279,67 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
           disabled={isRunning}
           renderToolbar={() => (
             <ChatInputToolbar
-              leftContent={
-                // Code 模式才显示文件附件按钮
-                mode === 'code' ? (
-                  <>
-                    <IconButton 
-                      variant="bordered" 
-                      icon={<AttachIcon />} 
-                      title="上传文件"
-                    />
-                    <IconButton 
-                      variant="bordered" 
-                      icon={<SlidersIcon />} 
-                      title="更多选项"
-                    />
-                    {isRealElectron() && (
-                      <Tooltip title={settings.workspace ? `工作目录：${settings.workspace}` : '点击选择工作目录'} position="bottom">
-                        <div 
-                          style={{
-                            ...styles.workspacePill,
-                            cursor: 'pointer',
-                          }}
-                          onClick={handleSelectWorkspace}
-                        >
-                          <FolderIcon size={13} />
-                          <span style={styles.workspaceText}>{workspaceName}</span>
-                        </div>
-                      </Tooltip>
-                    )}
-                  </>
-                ) : null
-              }
+              leftContent={(
+                <>
+                  <IconButton
+                    variant="bordered"
+                    icon={<AttachIcon />}
+                    title="上传文件"
+                  />
+                  <IconButton
+                    variant="bordered"
+                    icon={<SlidersIcon />}
+                    title="更多选项"
+                  />
+                  {/* 工作目录：Electron 显示，会话中只读 */}
+                  {isElectron() && (
+                    <Tooltip
+                      title={settings.workspace ? `工作目录：${settings.workspace}` : '未设置工作目录'}
+                      position="bottom"
+                    >
+                      <div style={styles.workspacePill}>
+                        <FolderIcon size={13} />
+                        <span style={styles.workspaceText}>{workspaceName}</span>
+                      </div>
+                    </Tooltip>
+                  )}
+                </>
+              )}
               rightContent={(
                 <>
-                  {/* Code 模式显示全能/高效模式切换 */}
-                  {mode === 'code' && (
-                    <div style={styles.modeSwitcher}>
-                      <Tooltip title="高效模式" position="bottom">
-                        <button
-                          style={{
-                            ...styles.modeBtn,
-                            ...(!isSmartMode ? styles.modeBtnActive : {}),
-                          }}
-                          onClick={() => setIsSmartMode(false)}
-                        >
-                          <LightningIcon size={15} />
-                        </button>
-                      </Tooltip>
-                      <Tooltip title="全能模式" position="bottom">
-                        <button
-                          style={{
-                            ...styles.modeBtn,
-                            ...(isSmartMode ? styles.modeBtnActive : {}),
-                          }}
-                          onClick={() => setIsSmartMode(true)}
-                        >
-                          <OmnipotentIcon size={15} />
-                        </button>
-                      </Tooltip>
-                    </div>
+                  {/* 新建子会话按钮（无分支时也显示） */}
+                  {!hasBranches && (
+                    <Tooltip title="创建子会话" position="top">
+                      <button
+                        style={styles.branchBtn}
+                        onClick={() => onCreateBranch?.()}
+                      >
+                        <PlusIcon size={13} />
+                      </button>
+                    </Tooltip>
                   )}
 
-                  {/* Chat 模式显示当前模型名 */}
+                  {/* 会话模式只读指示器（全能 / 高效） */}
+                  <div style={styles.modeReadOnly}>
+                    <Tooltip title={isSmartMode ? '全能模式（创建时选择，不可修改）' : '高效模式（创建时选择，不可修改）'} position="top">
+                      <div style={styles.modeIndicator}>
+                        {isSmartMode
+                          ? <OmnipotentIcon size={14} />
+                          : <LightningIcon size={14} />
+                        }
+                        <span style={styles.modeLabel}>{isSmartMode ? '全能' : '高效'}</span>
+                      </div>
+                    </Tooltip>
+                  </div>
+
+                  {/* 模型名（chat 模式显示） */}
                   {mode === 'chat' && settings.model && (
-                    <span style={styles.modelName}>{settings.model}</span>
+                    <span style={styles.modelName}>
+                      {settings.model.includes('sonnet') ? 'Sonnet'
+                        : settings.model.includes('opus') ? 'Opus'
+                        : settings.model.includes('haiku') ? 'Haiku'
+                        : settings.model}
+                    </span>
                   )}
 
                   <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
@@ -394,6 +363,7 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
     </div>
   )
 }
+
 // ─── Message bubble ───────────────────────────────────────────────────────────
 function MessageBubble({ message }: { message: Message }) {
   if (message.role === 'user') {
@@ -486,15 +456,6 @@ function PlusIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-function HistoryIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
-      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M7 4.5V7L9 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function AvatarIcon() {
   return (
     <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -516,12 +477,12 @@ function CheckMark({ color }: { color: string }) {
 
 function MiniChevron({ open }: { open: boolean }) {
   return (
-    <svg 
-      width="12" 
-      height="12" 
-      viewBox="0 0 12 12" 
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
       fill="none"
-      style={{ 
+      style={{
         transform: `rotate(${open ? '180deg' : '0deg'}`,
         transition: 'transform 0.2s ease',
       }}
@@ -531,100 +492,76 @@ function MiniChevron({ open }: { open: boolean }) {
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden' },
-  // 聊天顶部栏：容纳分支/历史按钮，独立于消息滚动区
-  chatHeader: {
-    flexShrink: 0,
-    height: 44,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    padding: '0 16px',
-  },
-  chatHeaderActions: {
-    position: 'relative',
-    display: 'flex',
-    gap: 6,
-  },
   messages: { flex: 1, overflowY: 'auto', padding: '8px 0 8px' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
   inputArea: { padding: '8px 20px 16px' },
-  modeSwitcher: {
-    display: 'flex',
-    border: '1px solid var(--border-medium)',
-    borderRadius: 8,
-    background: 'transparent',
-    padding: 2,
-    gap: 2,
-  },
-  modeBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 32,
-    height: 32,
-    border: 'none',
-    borderRadius: 6,
-    background: 'transparent',
-    cursor: 'pointer',
-    color: 'var(--icon-tertiary)',
-    transition: 'all 0.15s ease',
-    padding: 0,
-  },
-  modeBtnActive: {
-    background: 'var(--active-bg)',
-    color: 'var(--text-primary)',
-    fontWeight: 600,
-    borderRadius: 10,
-  },
+
+  // 工作目录只读 pill
   workspacePill: {
     display: 'flex', alignItems: 'center', gap: 5,
     padding: '0 10px',
     borderRadius: 8,
     border: '1px solid var(--border-medium)',
     background: 'transparent',
-    cursor: 'pointer',
+    cursor: 'default',
     marginLeft: 4,
     height: 36,
-    minWidth: 150,
-    maxWidth: 240,
+    minWidth: 100,
+    maxWidth: 200,
   },
-  workspaceText: { fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  // 简洁状态显示（无背景，垂直分割线）
-  statusItem: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    height: 36,
+  workspaceText: {
+    fontSize: 12, color: 'var(--text-secondary)',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
-  statusText: { 
-    fontSize: 13, 
-    color: 'var(--text-secondary)', 
-    overflow: 'hidden', 
-    textOverflow: 'ellipsis', 
-    whiteSpace: 'nowrap',
-    maxWidth: 120,
+
+  // 模式只读指示器
+  modeReadOnly: {
+    display: 'flex',
+    alignItems: 'center',
+    marginRight: 2,
   },
-  modeItem: {
-    display: 'flex', alignItems: 'center', gap: 5,
+  modeIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '0 8px',
     height: 30,
+    borderRadius: 8,
+    border: '1px solid var(--border-light)',
+    background: 'transparent',
+    color: 'var(--text-tertiary)',
+    cursor: 'default',
   },
-  modeText: {
-    fontSize: 13,
+  modeLabel: {
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
+    fontWeight: 500,
+  },
+
+  // 新建子会话按钮（无分支时在 toolbar 右侧显示）
+  branchBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    border: '1px solid var(--border-medium)',
+    background: 'transparent',
+    cursor: 'pointer',
     color: 'var(--text-secondary)',
-    fontWeight: 500,
+    padding: 0,
   },
-  divider: {
-    width: 1,
-    height: 20,
-    background: 'var(--border-light)',
-    margin: '0 8px',
-  },
+
   modelName: {
-    fontSize: 13, 
-    color: 'var(--text-secondary)', 
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
     fontWeight: 500,
-    paddingRight: 4,
+    paddingRight: 2,
   },
   sendBtn: {
     display: 'flex',
@@ -649,11 +586,69 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-disabled)',
     cursor: 'not-allowed',
   },
-  stopBtn: {
-    display: 'flex', alignItems: 'center', gap: 5,
-    padding: '5px 12px', background: 'var(--bg-secondary)',
-    border: '1px solid var(--border-medium)', borderRadius: 8,
-    cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'inherit',
+}
+
+// ─── 子会话 Tab 栏样式 ─────────────────────────────────────────────────────────
+const branchTabStyles: Record<string, React.CSSProperties> = {
+  bar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    padding: '0 16px',
+    height: 40,
+    flexShrink: 0,
+    borderBottom: '1px solid var(--border-light)',
+    overflowX: 'auto',
+    background: 'var(--bg-primary)',
+  },
+  tab: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '0 12px',
+    height: 28,
+    borderRadius: 6,
+    border: '1px solid transparent',
+    background: 'transparent',
+    cursor: 'pointer',
+    color: 'var(--text-secondary)',
+    fontSize: 12,
+    whiteSpace: 'nowrap',
+    maxWidth: 160,
+    transition: 'all 0.15s',
+    flexShrink: 0,
+  },
+  tabActive: {
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-medium)',
+    color: 'var(--text-primary)',
+    fontWeight: 500,
+  },
+  tabTitle: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    maxWidth: 100,
+  },
+  tabMeta: {
+    fontSize: 10,
+    color: 'var(--text-tertiary)',
+    flexShrink: 0,
+  },
+  newBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    border: '1px solid var(--border-medium)',
+    background: 'transparent',
+    cursor: 'pointer',
+    color: 'var(--text-tertiary)',
+    padding: 0,
+    flexShrink: 0,
+    marginLeft: 2,
   },
 }
 
@@ -681,104 +676,4 @@ const toolStyles: Record<string, React.CSSProperties> = {
 
 const mdStyles: Record<string, React.CSSProperties> = {
   p: { fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.7, margin: '2px 0' },
-}
-
-const floatStyles: Record<string, React.CSSProperties> = {
-  btn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    border: '1px solid var(--border-medium)',
-    background: 'var(--bg-primary)',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--text-secondary)',
-    transition: 'all 0.15s ease',
-    padding: 0,
-  },
-  btnActive: {
-    background: 'var(--bg-secondary)',
-    borderColor: 'var(--border-strong)',
-    color: 'var(--text-primary)',
-  },
-  panel: {
-    position: 'absolute',
-    top: 40,
-    right: 0,
-    width: 240,
-    background: 'var(--bg-primary)',
-    border: '1px solid var(--border-medium)',
-    borderRadius: 10,
-    boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
-    overflow: 'hidden',
-  },
-  panelHeader: {
-    padding: '10px 14px 8px',
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--text-tertiary)',
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase' as const,
-    borderBottom: '1px solid var(--border-light)',
-  },
-  list: {
-    maxHeight: 240,
-    overflowY: 'auto',
-  },
-  item: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 2,
-    padding: '9px 14px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    textAlign: 'left',
-    transition: 'background 0.12s',
-  },
-  itemActive: {
-    background: 'var(--bg-secondary)',
-  },
-  itemTitle: {
-    fontSize: 13,
-    color: 'var(--text-primary)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    width: '100%',
-    fontWeight: 500,
-  },
-  itemMeta: {
-    fontSize: 11,
-    color: 'var(--text-tertiary)',
-  },
-  empty: {
-    padding: '14px',
-    fontSize: 13,
-    color: 'var(--text-tertiary)',
-    textAlign: 'center',
-  },
-  panelDivider: {
-    height: 1,
-    background: 'var(--border-light)',
-    margin: '0',
-  },
-  createBtn: {
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '10px 14px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 13,
-    color: 'var(--text-secondary)',
-    fontFamily: 'inherit',
-    transition: 'background 0.12s',
-  },
 }

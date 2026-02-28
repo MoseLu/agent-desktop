@@ -23,7 +23,7 @@ import QuickChip from './HomePage/QuickChip'
 
 interface Props {
   settings: Settings
-  onStartTask: (prompt?: string) => void
+  onStartTask: (prompt?: string, smartMode?: boolean) => void
 }
 
 // 自定义 SVG 图标组件
@@ -154,7 +154,7 @@ export default function HomePage({ settings, onStartTask }: Props) {
   }, [input])
 
   const handleSubmit = (val: string) => {
-    onStartTask(val)
+    onStartTask(val, isSmartMode)
   }
 
   const handleTabClick = () => {
@@ -409,7 +409,7 @@ export default function HomePage({ settings, onStartTask }: Props) {
                 icon={<IconComponent size={ICON_SIZE} />}
                 label={chip.label}
                 color={chip.color}
-                onClick={() => onStartTask(`帮我${chip.label}`)}
+                onClick={() => onStartTask(`帮我${chip.label}`, isSmartMode)}
               />
             )
           })}

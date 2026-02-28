@@ -184,6 +184,18 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
 
 export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, onToggle }: TaskListProps) {
   const [hoverId, setHoverId] = React.useState<string | null>(null)
+  // 只显示根会话，子会话（分支）在 ChatPage 内的 tab 栏中展示
+  const rootConversations = conversations.filter(c => !c.parentId)
+
+  // 找到当前 activeId 所属的根会话 ID（用于侧边栏高亮）
+  const activeRootId = React.useMemo(() => {
+    if (!activeId) return null
+    let current = conversations.find(c => c.id === activeId)
+    while (current?.parentId) {
+      current = conversations.find(c => c.id === current!.parentId)
+    }
+    return current?.id ?? activeId
+  }, [activeId, conversations])
 
   const handleCopyId = async (id: string) => {
     try {
@@ -210,14 +222,14 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
 
       {isOpen && (
         <div style={styles.taskList}>
-          {conversations.length === 0 ? (
+          {rootConversations.length === 0 ? (
             <p style={styles.emptyText}>没有任务记录</p>
           ) : (
-            conversations.map(conversation => (
+            rootConversations.map(conversation => (
               <TaskItem
                 key={conversation.id}
                 conversation={conversation}
-                isActive={conversation.id === activeId}
+                isActive={conversation.id === activeRootId}
                 isHovered={hoverId === conversation.id}
                 onSelect={() => onSelect(conversation.id)}
                 onDelete={() => onDelete(conversation.id)}

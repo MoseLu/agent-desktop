@@ -51,6 +51,7 @@ export interface Conversation {
   createdAt: Date
   tabId?: string  // 关联的标签 ID
   parentId?: string  // 父会话 ID（分支会话时设置）
+  smartMode?: boolean  // 全能模式(true) / 高效模式(false)，在首页选择后锁定
 }
 
 export interface Tab {
