@@ -13,13 +13,14 @@
 const STORE_KEYS = {
   minimax   : { apiKey: 'proxy.minimax.apiKey',   baseUrl: 'proxy.minimax.baseUrl'   },
   qwen      : { apiKey: 'proxy.qwen.apiKey',      baseUrl: 'proxy.qwen.baseUrl'      },
+  qwenCoding: { apiKey: 'proxy.qwencoding.apiKey', baseUrl: 'proxy.qwencoding.baseUrl' },
   anthropic : { apiKey: 'proxy.anthropic.apiKey', baseUrl: 'proxy.anthropic.baseUrl' },
 }
 
-/** 默认 baseUrl（上游 API） */
 const DEFAULT_BASE_URLS = {
   minimax   : 'https://api.minimaxi.com',
   qwen      : 'https://dashscope.aliyuncs.com',
+  qwenCoding: 'https://coding.dashscope.aliyuncs.com/apps/anthropic',
   anthropic : 'https://api.anthropic.com',
 }
 

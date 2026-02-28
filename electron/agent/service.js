@@ -23,8 +23,13 @@ class AgentService {
     const m = (model || '').toLowerCase()
     if (m.includes('minimax') || m.includes('minimaxi')) {
       apiKey = proxyCfg.get('minimax')?.apiKey || ''
-    } else if (m.includes('qwen') || m.includes('qwq')) {
-      apiKey = proxyCfg.get('qwen')?.apiKey || ''
+    } else if (m.includes('qwen') || m.includes('qwq') || m.includes('coding')) {
+      // 百炼 Coding Plan 优先匹配
+      if (m.includes('coding')) {
+        apiKey = proxyCfg.get('qwenCoding')?.apiKey || ''
+      } else {
+        apiKey = proxyCfg.get('qwen')?.apiKey || ''
+      }
     } else if (m.includes('claude')) {
       apiKey = proxyCfg.get('anthropic')?.apiKey || ''
     } else {

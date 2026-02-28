@@ -23,9 +23,15 @@ const SYSTEM_PROMPT = `你是一个强大的桌面 AI 助手，直接运行在�
 // 配置方式（与 Coding Plan / MiniMax 一致）：
 //   ANTHROPIC_AUTH_TOKEN  — API Key（必填）
 //   ANTHROPIC_BASE_URL    — 自定义接入点，例如：
-//                           https://api.minimaxi.com/anthropic
-//                           https://coding.dashscope.aliyuncs.com/apps/anthropic
+//                           百炼 Coding Plan: https://coding.dashscope.aliyuncs.com/apps/anthropic
+//                           MiniMax:          https://api.minimaxi.com/anthropic
+//                           Anthropic:        https://api.anthropic.com
 //   ANTHROPIC_MODEL       — 默认模型（可被 settings 中的 model 字段覆盖）
+//
+// 前端配置说明：
+//   - 用户在前端只需切换模型，无需输入 API Key
+//   - API Key 和 Base URL 在 Electron 主进程的代理配置中统一管理
+//   - 根据模型名自动选择对应 provider 的配置
 
 class AgentLoop {
   constructor({ apiKey, model, workspace, maxSteps, onEvent }) {

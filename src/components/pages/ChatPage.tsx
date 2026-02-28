@@ -4,6 +4,8 @@ import IconButton from '@ui/IconButton'
 import Tooltip from '@ui/Tooltip'
 import ChatInput from '@ui/ChatInput'
 import ChatInputToolbar from '@ui/ChatInputToolbar'
+import ModelSelector from '@ui/ModelSelector'
+import { message } from '@ui/Message'
 import {
   AttachIcon,
   FolderIcon,
@@ -163,6 +165,7 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
     if (mode === 'chat') {
       try {
         const text = await sendChatMessage(
+          '', // Electron 环境下无需 API Key，由代理服务器统一管理
           settings.model,
           updated.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
         )
@@ -331,15 +334,16 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
                     </Tooltip>
                   </div>
 
-                  {/* 模型名（chat 模式显示） */}
-                  {mode === 'chat' && settings.model && (
-                    <span style={styles.modelName}>
-                      {settings.model.includes('sonnet') ? 'Sonnet'
-                        : settings.model.includes('opus') ? 'Opus'
-                        : settings.model.includes('haiku') ? 'Haiku'
-                        : settings.model}
-                    </span>
-                  )}
+                  {/* 模型切换器 */}
+                  <ModelSelector
+                    value={settings.model || 'qwen3.5-plus'}
+                    onChange={(newModel) => {
+                      window.electron.saveSettings({ model: newModel })
+                      message.success(`已切换到 ${newModel}`, 1500)
+                    }}
+                  />
+
+                  <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
 
                   <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
                     <button

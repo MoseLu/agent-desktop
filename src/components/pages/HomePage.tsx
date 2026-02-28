@@ -5,6 +5,7 @@ import ChatInput from '@ui/ChatInput'
 import ChatInputToolbar from '@ui/ChatInputToolbar'
 import ChatInputPlaceholder from '@ui/ChatInputPlaceholder'
 import Tooltip from '@ui/Tooltip'
+import ModelSelector from '@ui/ModelSelector'
 import { isElectron } from '@utils/env'
 import { message } from '@ui/Message'
 import {
@@ -355,6 +356,15 @@ export default function HomePage({ settings, onStartTask }: Props) {
               )}
               rightContent={(
                 <>
+                  {/* 模型切换器 */}
+                  <ModelSelector
+                    value={settings.model || 'qwen3.5-plus'}
+                    onChange={(newModel) => {
+                      window.electron.saveSettings({ model: newModel })
+                      message.success(`已切换到 ${newModel}`, 1500)
+                    }}
+                  />
+
                   <div style={styles.modeSwitcher}>
                     <Tooltip title="高效模式" position="bottom">
                       <button
