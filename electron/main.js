@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Menu } = require('electron')
 const path = require('path')
-const AgentLoop = require('./agent/loop')
+const AgentService = require('./agent/service')
 
 // electron-store 是 ESM 模块，需要动态导入
 let Store
@@ -10,6 +10,7 @@ const isDev = !app.isPackaged
 async function initStore() {
   Store = (await import('electron-store')).default
   store = new Store()
+  agentService = new AgentService(store)
 }
 
 // 移除默认菜单栏
@@ -18,7 +19,7 @@ function removeDefaultMenu() {
 }
 
 let mainWindow
-let agentLoop
+let agentService
 
 function createWindow() {
   // 从 store 读取主题，决定背景色
@@ -87,9 +88,10 @@ app.whenReady().then(async () => {
   }
 })
 
-app.on('window-all-closed', () => { 
+app.on('window-all-closed', () => {
   globalShortcut.unregisterAll()
-  if (process.platform !== 'darwin') app.quit() 
+  agentService?.stopAll()
+  if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
@@ -151,26 +153,18 @@ ipcMain.handle('pick-folder', async () => {
 })
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
-ipcMain.handle('agent-run', async (_, { messages, workspace }) => {
-  const apiKey = store.get('apiKey', '')
-  const model = store.get('model', 'claude-sonnet-4-20250514')
-  const maxSteps = store.get('maxSteps', 50)
+ipcMain.handle('agent-run', (_, { conversationId, messages, workspace }) =>
+  agentService.run(
+    conversationId,
+    { messages, workspace },
+    (ev) => mainWindow?.webContents.send('agent-event', ev),
+  )
+)
 
-  if (!apiKey) return { error: '请先在设置中填写 API Key' }
-
-  agentLoop = new AgentLoop({
-    apiKey, model, workspace, maxSteps,
-    onEvent: (ev) => mainWindow?.webContents.send('agent-event', ev),
-  })
-
-  try {
-    return { result: await agentLoop.run(messages) }
-  } catch (err) {
-    return { error: err.message }
-  }
+ipcMain.handle('agent-stop', (_, conversationId) => {
+  agentService.stop(conversationId)
+  return { ok: true }
 })
-
-ipcMain.handle('agent-stop', () => { agentLoop?.stop(); return { ok: true } })
 
 // ─── Filesystem ───────────────────────────────────────────────────────────────
 ipcMain.handle('fs-list', async (_, dirPath) => {

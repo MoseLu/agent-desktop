@@ -49,7 +49,9 @@ export interface Conversation {
   title: string
   messages: Message[]
   createdAt: Date
-  tabId?: string  // 关联的标签 ID
+  tabId?: string      // 关联的标签 ID
+  parentId?: string   // 分支来源对话 ID（仅分支会话有值）
+  branchPoint?: number // 从第几条消息（含）处分叉，0-based
 }
 
 export interface Tab {
@@ -59,7 +61,7 @@ export interface Tab {
   isDefault: boolean  // 是否为默认标签
 }
 
-export type AgentEvent =
+export type AgentEventPayload =
   | { type: 'start'; workspace: string }
   | { type: 'step'; step: number; maxSteps: number }
   | { type: 'text'; text: string }
@@ -70,14 +72,17 @@ export type AgentEvent =
   | { type: 'stopped' }
   | { type: 'thinking'; message: string }
 
+/** 从主进程到达渲染层的事件，附带来源会话 ID */
+export type AgentEvent = AgentEventPayload & { conversationId: string }
+
 declare global {
   interface Window {
     electron: {
       getSettings: () => Promise<Settings>
       saveSettings: (s: Partial<Settings>) => Promise<{ ok: boolean }>
       pickFolder: () => Promise<string | null>
-      agentRun: (p: { messages: Pick<Message, 'role' | 'content'>[]; workspace: string }) => Promise<{ result?: unknown; error?: string }>
-      agentStop: () => Promise<{ ok: boolean }>
+      agentRun: (p: { conversationId: string; messages: Pick<Message, 'role' | 'content'>[]; workspace: string }) => Promise<{ result?: unknown; error?: string }>
+      agentStop: (conversationId: string) => Promise<{ ok: boolean }>
       onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void
       fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>
       openInExplorer: (p: string) => void

@@ -253,6 +253,33 @@ function AppContent() {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...updater(c) } : c))
   }, [])
 
+  /**
+   * 从 sourceId 对话的第 atIndex 条消息处（含）创建分支会话，并在新 Tab 中打开。
+   */
+  const branchConversation = useCallback((sourceId: string, atIndex: number) => {
+    const source = conversations.find(c => c.id === sourceId)
+    if (!source) return
+
+    const id = Date.now().toString()
+    const tabId = `tab-${Date.now() + 1}`
+    const branchTitle = `${source.title.slice(0, 20)} · 分支`
+    const conv: Conversation = {
+      id,
+      title: branchTitle,
+      messages: source.messages.slice(0, atIndex + 1),
+      createdAt: new Date(),
+      tabId,
+      parentId: sourceId,
+      branchPoint: atIndex,
+    }
+
+    setConversations(prev => [conv, ...prev])
+    setTabs(prev => [...prev, { id: tabId, title: branchTitle, conversationId: id, isDefault: false }])
+    setActiveTabId(tabId)
+    setActiveId(id)
+    setPage('chat')
+  }, [conversations])
+
   const deleteConv = (id: string) => {
     setConversations(prev => prev.filter(c => c.id !== id))
     if (activeId === id) {
@@ -305,6 +332,7 @@ function AppContent() {
               conversation={activeConv}
               settings={settings}
               onUpdate={(updater) => updateConv(activeId!, updater)}
+              onBranch={(atIndex) => branchConversation(activeId!, atIndex)}
             />
           ) : (
             <HomePage

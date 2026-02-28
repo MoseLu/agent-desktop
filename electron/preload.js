@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('electron', {
   saveSettings: (s) => ipcRenderer.invoke('save-settings', s),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   agentRun: (p) => ipcRenderer.invoke('agent-run', p),
-  agentStop: () => ipcRenderer.invoke('agent-stop'),
+  agentStop: (conversationId) => ipcRenderer.invoke('agent-stop', conversationId),
   onAgentEvent: (cb) => {
     const h = (_, d) => cb(d)
     ipcRenderer.on('agent-event', h)

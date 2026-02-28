@@ -21,9 +21,10 @@ interface Props {
   conversation: Conversation
   settings: Settings
   onUpdate: (updater: (c: Conversation) => Partial<Conversation>) => void
+  onBranch: (atIndex: number) => void
 }
 
-export default function ChatPage({ conversation, settings, onUpdate }: Props) {
+export default function ChatPage({ conversation, settings, onUpdate, onBranch }: Props) {
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
@@ -44,6 +45,8 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
   }, [messages])
 
   const handleAgentEvent = useCallback((ev: AgentEvent) => {
+    // 只处理属于本对话的事件，防止多标签并发时串扰
+    if (ev.conversationId !== conversation.id) return
     switch (ev.type) {
       case 'step':
         setStatusText(`步骤 ${ev.step} / ${ev.maxSteps}`)
@@ -142,6 +145,7 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
     }
 
     const result = await window.electron.agentRun({
+      conversationId: conversation.id,
       messages: updated.map(m => ({ role: m.role, content: m.content })),
       workspace: settings.workspace,
     })
@@ -157,13 +161,22 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
   const chatColumn = (
     <div style={styles.chatColumn}>
       <div style={styles.messages}>
+        {/* 分支来源提示 */}
+        {conversation.parentId && (
+          <div style={styles.branchBanner}>
+            <BranchIcon />
+            <span>此会话从第 {(conversation.branchPoint ?? 0) + 1} 条消息处分叉</span>
+          </div>
+        )}
         {messages.map((msg, i) => (
           <MessageBubble
             key={i}
             message={msg}
+            messageIndex={i}
             selectedToolId={rightPanel?.mode === 'tool' ? rightPanel.event.id : null}
             onSelectTool={event => { setRightPanel({ mode: 'tool', event }); setShowPreview(false) }}
             onShowFiles={events => { setRightPanel({ mode: 'files', events }); setShowPreview(false) }}
+            onBranch={onBranch}
           />
         ))}
         {isRunning && statusText && (
@@ -323,15 +336,32 @@ function getResultText(result?: Record<string, unknown>): string {
 }
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
-function MessageBubble({ message, selectedToolId, onSelectTool, onShowFiles }: {
+function MessageBubble({ message, messageIndex, selectedToolId, onSelectTool, onShowFiles, onBranch }: {
   message: Message
+  messageIndex: number
   selectedToolId: string | null
   onSelectTool: (event: ToolEvent) => void
   onShowFiles: (events: ToolEvent[]) => void
+  onBranch: (atIndex: number) => void
 }) {
+  const [hovered, setHovered] = useState(false)
+
   if (message.role === 'user') {
     return (
-      <div style={msgStyles.userRow}>
+      <div
+        style={msgStyles.userRow}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {hovered && (
+          <button
+            style={msgStyles.branchBtn}
+            title="从此处创建分支会话"
+            onClick={() => onBranch(messageIndex)}
+          >
+            <BranchIcon />
+          </button>
+        )}
         <div style={msgStyles.userBubble}>
           <p style={msgStyles.userText}>{message.content}</p>
         </div>
@@ -559,6 +589,18 @@ function AvatarIcon() {
   )
 }
 
+function BranchIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ display: 'block' }}>
+      <circle cx="4" cy="3" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="4" cy="13" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="12" cy="7" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M4 4.5V8C4 9.1 4.9 10 6 10H10.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M4 11.5V8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function CheckMark({ color }: { color: string }) {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color }}>
@@ -621,6 +663,16 @@ const styles: Record<string, React.CSSProperties> = {
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
   inputArea: { padding: '12px 24px 20px', borderTop: '1px solid var(--border-light)' },
+  branchBanner: {
+    display: 'flex', alignItems: 'center', gap: 7,
+    margin: '0 32px 12px',
+    padding: '6px 12px',
+    borderRadius: 7,
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-light)',
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
+  },
   modeSwitcher: {
     display: 'flex',
     border: '1px solid var(--border-medium)',
@@ -748,7 +800,18 @@ const styles: Record<string, React.CSSProperties> = {
 }
 
 const msgStyles: Record<string, React.CSSProperties> = {
-  userRow: { display: 'flex', justifyContent: 'flex-end', padding: '6px 32px' },
+  userRow: { display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 6, padding: '6px 32px' },
+  branchBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 26, height: 26, flexShrink: 0,
+    border: '1px solid var(--border-medium)',
+    borderRadius: 6,
+    background: 'var(--bg-secondary)',
+    cursor: 'pointer',
+    color: 'var(--text-tertiary)',
+    padding: 0,
+    transition: 'color 0.15s, border-color 0.15s',
+  },
   userBubble: { maxWidth: '70%', background: 'var(--bg-secondary)', borderRadius: '14px 14px 4px 14px', padding: '11px 15px' },
   userText: { fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.65 },
   assistantRow: { display: 'flex', gap: 11, padding: '6px 32px', alignItems: 'flex-start' },
