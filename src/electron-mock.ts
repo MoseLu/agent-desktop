@@ -190,6 +190,74 @@ const createMockElectron = (): ElectronAPI => {
       return { ok: true }
     },
 
+    // Account Management
+    getAccounts: async () => {
+      const stored = localStorage.getItem('mock-accounts')
+      let accounts = stored ? JSON.parse(stored) : []
+      // 如果没有账号，创建默认账号
+      if (accounts.length === 0) {
+        const defaultAccount = {
+          userName: '默认账号',
+          userAvatar: '',
+          createdAt: new Date().toISOString(),
+        }
+        accounts = [defaultAccount]
+        localStorage.setItem('mock-accounts', JSON.stringify(accounts))
+      }
+      return accounts
+    },
+
+    createAccount: async (userName: string, userAvatar = '') => {
+      if (!userName || !userName.trim()) {
+        return { ok: false, error: '用户名不能为空' }
+      }
+      const stored = localStorage.getItem('mock-accounts')
+      const accounts: any[] = stored ? JSON.parse(stored) : []
+      if (accounts.some(a => a.userName === userName.trim())) {
+        return { ok: false, error: '该用户名已存在' }
+      }
+      const newAccount = {
+        userName: userName.trim(),
+        userAvatar,
+        createdAt: new Date().toISOString(),
+      }
+      accounts.push(newAccount)
+      localStorage.setItem('mock-accounts', JSON.stringify(accounts))
+      return { ok: true, account: newAccount }
+    },
+
+    getAccountInfo: async (userName: string) => {
+      const stored = localStorage.getItem('mock-accounts')
+      const accounts: any[] = stored ? JSON.parse(stored) : []
+      return accounts.find(a => a.userName === userName) || null
+    },
+
+    deleteAccount: async (userName: string) => {
+      const stored = localStorage.getItem('mock-accounts')
+      const accounts: any[] = stored ? JSON.parse(stored) : []
+      const filtered = accounts.filter(a => a.userName !== userName)
+      if (filtered.length === accounts.length) {
+        return { ok: false, error: '账号不存在' }
+      }
+      if (filtered.length === 0) {
+        return { ok: false, error: '不能删除最后一个账号' }
+      }
+      localStorage.setItem('mock-accounts', JSON.stringify(filtered))
+      return { ok: true }
+    },
+
+    updateAvatar: async (userName: string, userAvatar: string) => {
+      const stored = localStorage.getItem('mock-accounts')
+      const accounts: any[] = stored ? JSON.parse(stored) : []
+      const idx = accounts.findIndex(a => a.userName === userName)
+      if (idx === -1) {
+        return { ok: false, error: '账号不存在' }
+      }
+      accounts[idx] = { ...accounts[idx], userAvatar }
+      localStorage.setItem('mock-accounts', JSON.stringify(accounts))
+      return { ok: true }
+    },
+
     convList: async () => {
       const userName = localStorage.getItem('mock-auth-user') || 'default'
       try {

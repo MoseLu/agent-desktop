@@ -323,6 +323,15 @@ function AppContent() {
   const handleLogin = useCallback(async (userName: string) => {
     if (isElectron()) {
       await window.electron.authLogin(userName)
+      // 获取账号信息，同步头像到设置
+      try {
+        const account = await window.electron.getAccountInfo(userName)
+        if (account?.userAvatar) {
+          await window.electron.saveSettings({ userAvatar: account.userAvatar })
+        }
+      } catch (err) {
+        console.error('Failed to get account info:', err)
+      }
     }
     setCurrentUser(userName)
     // 加载设置和会话

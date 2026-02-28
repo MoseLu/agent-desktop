@@ -181,11 +181,90 @@ ipcMain.handle('auth:check', () => {
 
 ipcMain.handle('auth:login', (_, userName) => {
   store.set('auth.currentUser', userName)
+  // 同步到设置中的 userName，确保登录用户和设置显示一致
+  store.set('userName', userName)
   return { ok: true }
 })
 
 ipcMain.handle('auth:logout', () => {
   store.delete('auth.currentUser')
+  return { ok: true }
+})
+
+// ─── Account Management ────────────────────────────────────────────────────────
+
+// 获取所有账号列表
+ipcMain.handle('auth:getAccounts', () => {
+  const accounts = store.get('auth.accounts', [])
+  // 如果没有账号，创建一个默认账号
+  if (!accounts || accounts.length === 0) {
+    const defaultAccount = {
+      userName: '默认账号',
+      userAvatar: '',
+      createdAt: new Date().toISOString(),
+    }
+    store.set('auth.accounts', [defaultAccount])
+    return [defaultAccount]
+  }
+  return accounts
+})
+
+// 创建新账号
+ipcMain.handle('auth:createAccount', (_, { userName, userAvatar = '' }) => {
+  if (!userName || !userName.trim()) {
+    return { ok: false, error: '用户名不能为空' }
+  }
+  const accounts = store.get('auth.accounts', [])
+  // 检查是否已存在
+  if (accounts.some(a => a.userName === userName.trim())) {
+    return { ok: false, error: '该用户名已存在' }
+  }
+  const newAccount = {
+    userName: userName.trim(),
+    userAvatar,
+    createdAt: new Date().toISOString(),
+  }
+  accounts.push(newAccount)
+  store.set('auth.accounts', accounts)
+  return { ok: true, account: newAccount }
+})
+
+// 获取指定账号信息
+ipcMain.handle('auth:getAccountInfo', (_, userName) => {
+  const accounts = store.get('auth.accounts', [])
+  const account = accounts.find(a => a.userName === userName)
+  return account || null
+})
+
+// 删除账号
+ipcMain.handle('auth:deleteAccount', (_, userName) => {
+  const accounts = store.get('auth.accounts', [])
+  const filtered = accounts.filter(a => a.userName !== userName)
+  if (filtered.length === accounts.length) {
+    return { ok: false, error: '账号不存在' }
+  }
+  // 不允许删除最后一个账号
+  if (filtered.length === 0) {
+    return { ok: false, error: '不能删除最后一个账号' }
+  }
+  store.set('auth.accounts', filtered)
+  // 如果当前登录的是这个账号，则退出登录
+  const current = store.get('auth.currentUser', '')
+  if (current === userName) {
+    store.delete('auth.currentUser')
+  }
+  return { ok: true }
+})
+
+// 更新账号头像
+ipcMain.handle('auth:updateAvatar', (_, { userName, userAvatar }) => {
+  const accounts = store.get('auth.accounts', [])
+  const idx = accounts.findIndex(a => a.userName === userName)
+  if (idx === -1) {
+    return { ok: false, error: '账号不存在' }
+  }
+  accounts[idx] = { ...accounts[idx], userAvatar }
+  store.set('auth.accounts', accounts)
   return { ok: true }
 })
 
@@ -240,6 +319,10 @@ ipcMain.handle('get-settings', () => ({
 
 ipcMain.handle('save-settings', (_, s) => {
   Object.entries(s).forEach(([k, v]) => store.set(k, v))
+  // 如果修改了 userName，同步更新 auth.currentUser，确保登录状态和设置一致
+  if (s.userName != null) {
+    store.set('auth.currentUser', s.userName)
+  }
   return { ok: true }
 })
 

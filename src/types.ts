@@ -3,6 +3,13 @@ export interface FolderPermission {
   permission: 'read' | 'write' | 'read-write'
 }
 
+/** 用户账号信息 */
+export interface UserAccount {
+  userName: string
+  userAvatar?: string
+  createdAt: string
+}
+
 /** 代理配置中单个 provider 的状态（apiKey 已掩码，可安全传给渲染进程） */
 export interface ProxyProviderStatus {
   configured: boolean  // 是否已设置 API Key
@@ -149,6 +156,12 @@ declare global {
       authCheck: () => Promise<{ userName: string | null }>
       authLogin: (userName: string) => Promise<{ ok: boolean }>
       authLogout: () => Promise<{ ok: boolean }>
+      // Account Management
+      getAccounts: () => Promise<UserAccount[]>
+      createAccount: (userName: string, userAvatar?: string) => Promise<{ ok: boolean; error?: string; account?: UserAccount }>
+      getAccountInfo: (userName: string) => Promise<UserAccount | null>
+      deleteAccount: (userName: string) => Promise<{ ok: boolean; error?: string }>
+      updateAvatar: (userName: string, userAvatar: string) => Promise<{ ok: boolean; error?: string }>
       // Conversations persistence
       convList: () => Promise<StoredConversation[]>
       convSave: (conv: StoredConversation) => Promise<{ ok: boolean }>

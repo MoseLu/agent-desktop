@@ -33,6 +33,12 @@ contextBridge.exposeInMainWorld('electron', {
   authCheck: () => ipcRenderer.invoke('auth:check'),
   authLogin: (userName) => ipcRenderer.invoke('auth:login', userName),
   authLogout: () => ipcRenderer.invoke('auth:logout'),
+  // Account Management
+  getAccounts: () => ipcRenderer.invoke('auth:getAccounts'),
+  createAccount: (userName, userAvatar) => ipcRenderer.invoke('auth:createAccount', { userName, userAvatar }),
+  getAccountInfo: (userName) => ipcRenderer.invoke('auth:getAccountInfo', userName),
+  deleteAccount: (userName) => ipcRenderer.invoke('auth:deleteAccount', userName),
+  updateAvatar: (userName, userAvatar) => ipcRenderer.invoke('auth:updateAvatar', { userName, userAvatar }),
   // Conversations persistence
   convList: () => ipcRenderer.invoke('conv:list'),
   convSave: (conv) => ipcRenderer.invoke('conv:save', conv),
