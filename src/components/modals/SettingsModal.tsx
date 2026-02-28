@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
-import type { Settings, FolderPermission } from '@types'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import type { Settings, FolderPermission, ProxyConfigStatus } from '@types'
 import { appConfig } from '@config'
 import { CameraOutlined } from '@ant-design/icons'
 import { isElectron } from '@utils/env'
@@ -10,7 +10,7 @@ import { message } from '@ui/Message'
 // 模型列表预留 - 后续从后端 API 获取
 const DEFAULT_MODELS: Array<{ id: string; label: string }> = []
 
-type SettingsTab = 'account' | 'general' | 'desktop-general' | 'notifications' | 'scheduled-tasks'
+type SettingsTab = 'account' | 'general' | 'desktop-general' | 'notifications' | 'scheduled-tasks' | 'proxy'
 
 interface Props {
   initial: Settings
@@ -32,6 +32,31 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
     userName: initial.userName ?? '',
     userAvatar: initial.userAvatar ?? '',
   })
+
+  // 代理配置状态
+  const [proxyConfig, setProxyConfig] = useState<ProxyConfigStatus>({})
+  const [proxyPort, setProxyPort] = useState<number>(0)
+  const [proxyKeyInputs, setProxyKeyInputs] = useState<Record<string, string>>({})
+  const [proxyBaseUrlInputs, setProxyBaseUrlInputs] = useState<Record<string, string>>({})
+  const [proxyTesting, setProxyTesting] = useState<Record<string, boolean>>({})
+
+  const loadProxyConfig = useCallback(async () => {
+    if (!isElectron()) return
+    try {
+      const [port, cfg] = await Promise.all([
+        window.electron.getProxyPort(),
+        window.electron.getProxyConfig(),
+      ])
+      setProxyPort(port)
+      setProxyConfig(cfg)
+    } catch (err) {
+      console.error('加载代理配置失败:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'proxy') loadProxyConfig()
+  }, [activeTab, loadProxyConfig])
 
   // 防抖磁盘写入：积累所有待保存字段，500ms 后批量写入
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -582,6 +607,124 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
           </div>
         )
 
+      case 'proxy': {
+        const providers = [
+          { id: 'minimax',   label: 'MiniMax',        defaultBase: 'https://api.minimaxi.com' },
+          { id: 'qwen',      label: '通义千问 Qwen',   defaultBase: 'https://dashscope.aliyuncs.com' },
+          { id: 'anthropic', label: 'Anthropic Claude', defaultBase: 'https://api.anthropic.com' },
+        ]
+
+        const saveProviderKey = async (provider: string) => {
+          const apiKey  = proxyKeyInputs[provider]
+          const baseUrl = proxyBaseUrlInputs[provider] || undefined
+          if (!apiKey?.trim()) { message.warning('请先输入 API Key', 2000); return }
+          try {
+            const result = await window.electron.saveProxyConfig({ provider, apiKey: apiKey.trim(), baseUrl })
+            if (result.ok) {
+              message.success(`${provider} API Key 已保存`, 2000)
+              setProxyKeyInputs(p => ({ ...p, [provider]: '' }))
+              loadProxyConfig()
+            } else {
+              message.error(result.error || '保存失败', 3000)
+            }
+          } catch (err) { message.error('保存失败', 3000) }
+        }
+
+        const testProvider = async (provider: string) => {
+          setProxyTesting(p => ({ ...p, [provider]: true }))
+          try {
+            const result = await window.electron.testProxyProvider({ provider })
+            if (result.ok) {
+              message.success(`✅ ${provider} 连接成功`, 3000)
+            } else {
+              message.error(`❌ ${provider} 连接失败：${result.error}`, 5000)
+            }
+          } catch (err) {
+            message.error(`测试失败：${(err as Error).message}`, 5000)
+          } finally {
+            setProxyTesting(p => ({ ...p, [provider]: false }))
+          }
+        }
+
+        return (
+          <div style={styles.tabContent}>
+            {/* 代理服务器状态 */}
+            <div style={proxyStyles.statusCard}>
+              <div style={proxyStyles.statusDot(proxyPort > 0)} />
+              <div>
+                <div style={proxyStyles.statusTitle}>
+                  {proxyPort > 0 ? `代理服务器运行中` : '代理服务器未启动'}
+                </div>
+                {proxyPort > 0 && (
+                  <div style={proxyStyles.statusDesc}>
+                    http://127.0.0.1:{proxyPort}
+                    <span style={proxyStyles.statusNote}>（仅本机访问）</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={proxyStyles.divider} />
+
+            {/* 各 provider 配置 */}
+            {providers.map(p => {
+              const status = (proxyConfig as any)[p.id] as ProxyConfigStatus[keyof ProxyConfigStatus] | undefined
+              const isTesting = proxyTesting[p.id]
+              return (
+                <div key={p.id} style={proxyStyles.providerCard}>
+                  <div style={proxyStyles.providerHeader}>
+                    <div style={proxyStyles.providerLabel}>{p.label}</div>
+                    {status?.configured
+                      ? <span style={proxyStyles.badge('ok')}>已配置 · {status.maskedKey}</span>
+                      : <span style={proxyStyles.badge('empty')}>未配置</span>
+                    }
+                  </div>
+
+                  <div style={proxyStyles.providerRow}>
+                    <input
+                      type="password"
+                      style={{ ...styles.input, flex: 1 }}
+                      value={proxyKeyInputs[p.id] || ''}
+                      onChange={e => setProxyKeyInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      placeholder={status?.configured ? '输入新 Key 以更换' : '输入 API Key'}
+                    />
+                    <button
+                      style={styles.toggleBtn}
+                      onClick={() => saveProviderKey(p.id)}
+                      disabled={!proxyKeyInputs[p.id]?.trim()}
+                    >
+                      保存
+                    </button>
+                    <button
+                      style={{ ...styles.toggleBtn, opacity: status?.configured ? 1 : 0.4 }}
+                      onClick={() => testProvider(p.id)}
+                      disabled={!status?.configured || isTesting}
+                    >
+                      {isTesting ? '测试中...' : '测试'}
+                    </button>
+                  </div>
+
+                  <div style={proxyStyles.providerRow}>
+                    <input
+                      type="text"
+                      style={{ ...styles.input, flex: 1, fontSize: 12 }}
+                      value={proxyBaseUrlInputs[p.id] ?? (status?.baseUrl || '')}
+                      onChange={e => setProxyBaseUrlInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      placeholder={`上游地址（默认：${p.defaultBase}）`}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
+              API Key 仅存储在本机，不会传输到渲染进程或云端。
+              前端只需切换模型，无需配置 Key。
+            </div>
+          </div>
+        )
+      }
+
       default:
         return null
     }
@@ -594,6 +737,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       case 'desktop-general': return '通用'
       case 'notifications': return '通知'
       case 'scheduled-tasks': return '定时任务'
+      case 'proxy': return '代理配置'
       default: return ''
     }
   }
@@ -669,6 +813,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
               <div style={styles.sidebarSectionTitle}>桌面设置</div>
               <NavItem active={activeTab === 'desktop-general'} onClick={() => setActiveTab('desktop-general')} icon={<DesktopIcon />}>通用</NavItem>
               <NavItem active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} icon={<BellIcon />}>通知</NavItem>
+              <NavItem active={activeTab === 'proxy'} onClick={() => setActiveTab('proxy')} icon={<ProxyIcon />}>代理配置</NavItem>
             </div>
           </div>
         </div>
@@ -710,6 +855,56 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       )}
     </div>
   )
+}
+
+function ProxyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="7.5" cy="7.5" r="2.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M7.5 1.5V5M7.5 10V13.5M1.5 7.5H5M10 7.5H13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+const proxyStyles = {
+  statusCard: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '12px 14px',
+    borderRadius: 10,
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-light)',
+    marginBottom: 12,
+  } as React.CSSProperties,
+  statusDot: (ok: boolean) => ({
+    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+    background: ok ? '#22c55e' : '#f59e0b',
+    boxShadow: ok ? '0 0 0 3px rgba(34,197,94,0.2)' : '0 0 0 3px rgba(245,158,11,0.2)',
+  } as React.CSSProperties),
+  statusTitle: { fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' } as React.CSSProperties,
+  statusDesc: { fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 } as React.CSSProperties,
+  statusNote: { marginLeft: 6, color: 'var(--text-tertiary)' } as React.CSSProperties,
+  divider: { height: 1, background: 'var(--border-light)', margin: '4px 0 16px' } as React.CSSProperties,
+  providerCard: {
+    border: '1px solid var(--border-light)',
+    borderRadius: 10,
+    padding: '12px 14px',
+    marginBottom: 10,
+    background: 'var(--bg-primary)',
+  } as React.CSSProperties,
+  providerHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 10,
+  } as React.CSSProperties,
+  providerLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' } as React.CSSProperties,
+  badge: (type: 'ok' | 'empty') => ({
+    fontSize: 11, fontWeight: 500,
+    padding: '2px 8px', borderRadius: 20,
+    background: type === 'ok' ? 'rgba(34,197,94,0.12)' : 'var(--bg-secondary)',
+    color: type === 'ok' ? '#16a34a' : 'var(--text-tertiary)',
+    border: `1px solid ${type === 'ok' ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`,
+  } as React.CSSProperties),
+  providerRow: { display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 } as React.CSSProperties,
 }
 
 function NavItem({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {

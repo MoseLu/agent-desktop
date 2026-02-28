@@ -3,6 +3,20 @@ export interface FolderPermission {
   permission: 'read' | 'write' | 'read-write'
 }
 
+/** 代理配置中单个 provider 的状态（apiKey 已掩码，可安全传给渲染进程） */
+export interface ProxyProviderStatus {
+  configured: boolean  // 是否已设置 API Key
+  maskedKey : string   // 掩码后的 Key，如 "sk-a***b123"
+  baseUrl   : string   // 上游 API 地址
+}
+
+/** 全局代理配置状态 */
+export interface ProxyConfigStatus {
+  minimax?   : ProxyProviderStatus
+  qwen?      : ProxyProviderStatus
+  anthropic? : ProxyProviderStatus
+}
+
 export interface Settings {
   apiKey: string
   workspace: string
@@ -83,6 +97,11 @@ declare global {
       openExternal: (url: string) => Promise<void>
       setAutoLaunch: (enabled: boolean) => Promise<{ ok: boolean }>
       getAutoLaunch: () => Promise<{ openAtLogin: boolean }>
+      // 本地代理服务器
+      getProxyPort: () => Promise<number>
+      getProxyConfig: () => Promise<ProxyConfigStatus>
+      saveProxyConfig: (p: { provider: string; apiKey?: string; baseUrl?: string }) => Promise<{ ok: boolean; error?: string }>
+      testProxyProvider: (p: { provider: string }) => Promise<{ ok: boolean; content?: string; error?: string }>
       // Agent Hub (多 Agent 支持)
       checkAvailableAgents: () => Promise<string[]>
       testAgent: (params: { model: string; apiKey: string }) => Promise<{ success: boolean; content?: string; error?: string }>

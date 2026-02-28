@@ -2,11 +2,15 @@ const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Menu } = req
 const path = require('path')
 const AgentService = require('./agent/service')
 const { AgentHub } = require('./agent/agent-hub')
+const ProxyServer = require('./proxy/server')
+const ProxyConfig = require('./proxy/config')
 
 // electron-store 是 ESM 模块，需要动态导入
 let Store
 let store
 let agentHub
+let proxyServer   // 本地代理 HTTP 服务器
+let proxyConfig   // 代理配置管理器
 const isDev = !app.isPackaged
 
 // 配置 CCSwith 代理（如果启用）
@@ -35,7 +39,15 @@ async function initStore() {
   store = new Store()
   agentService = new AgentService(store)
   agentHub = new AgentHub()
-  
+
+  // 初始化代理配置并迁移旧版 Key
+  proxyConfig = new ProxyConfig(store)
+  proxyConfig.migrateFromLegacy()
+
+  // 启动本地代理服务器（随机端口，仅绑定 127.0.0.1）
+  proxyServer = new ProxyServer(() => proxyConfig.getAll())
+  await proxyServer.start()
+
   // 初始化时检查可用的 Agent
   checkAvailableAgents()
 }
@@ -144,6 +156,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   globalShortcut.unregisterAll()
   agentService?.stopAll()
+  proxyServer?.stop()
   if (process.platform !== 'darwin') app.quit()
 })
 
@@ -312,36 +325,70 @@ ipcMain.handle('open-in-explorer', (_, p) => shell.showItemInFolder(p))
 
 ipcMain.handle('open-external', (_, url) => shell.openExternal(url))
 
-// ─── Chat Message Proxy (bypasses renderer CORS) ──────────────────────────────
-ipcMain.handle('chat-message', async (_, { provider, apiKey, model, messages }) => {
+// ─── Proxy Server Info ─────────────────────────────────────────────────────────
+// 获取本地代理服务器端口（供渲染进程发起 HTTP 请求时使用）
+ipcMain.handle('get-proxy-port', () => proxyServer?.port ?? 0)
+
+// ─── Proxy Config Management ───────────────────────────────────────────────────
+// 获取代理配置状态（apiKey 已掩码，不暴露明文）
+ipcMain.handle('get-proxy-config', () => proxyConfig?.getStatus() ?? {})
+
+// 保存某个 provider 的配置
+ipcMain.handle('save-proxy-config', (_, { provider, apiKey, baseUrl }) => {
   try {
-    let url, headers, body
+    proxyConfig.save(provider, { apiKey, baseUrl })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
 
-    if (provider === 'minimax') {
-      url = 'https://api.minimaxi.com/anthropic/v1/messages'
-      headers = {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-      }
-      body = JSON.stringify({
+// 测试 provider 连通性（通过本地代理服务器发一条测试消息）
+ipcMain.handle('test-proxy-provider', async (_, { provider }) => {
+  const cfg = proxyConfig?.get(provider)
+  if (!cfg?.apiKey) return { ok: false, error: '未配置 API Key' }
+
+  const model = provider === 'minimax' ? 'MiniMax-Text-01'
+    : provider === 'qwen'      ? 'qwen-plus'
+    : provider === 'anthropic' ? 'claude-haiku-4-5-20251001'
+    : null
+  if (!model) return { ok: false, error: `未知 provider: ${provider}` }
+
+  try {
+    const port = proxyServer?.port
+    if (!port) return { ok: false, error: '代理服务器未启动' }
+
+    const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({
         model,
-        max_tokens: 8096,
-        messages: messages
-          .filter(m => m.role !== 'system')
-          .map(m => ({ role: m.role, content: m.content })),
-      })
-    } else if (provider === 'qwen') {
-      url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
-      headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      }
-      body = JSON.stringify({ model, messages })
-    } else {
-      return { ok: false, error: `Unsupported provider: ${provider}` }
+        max_tokens : 32,
+        messages   : [{ role: 'user', content: 'hi' }],
+      }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      const content = data.choices?.[0]?.message?.content ?? ''
+      return { ok: true, content }
     }
+    return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
 
-    const res = await fetch(url, { method: 'POST', headers, body })
+// ─── Chat Message Proxy (主进程通过代理服务器转发，无需渲染进程持有 apiKey) ────
+ipcMain.handle('chat-message', async (_, { model, messages }) => {
+  try {
+    const port = proxyServer?.port
+    if (!port) return { ok: false, error: '代理服务器未启动' }
+
+    const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({ model, messages, max_tokens: 8096 }),
+    })
     const data = await res.json()
     return { ok: res.ok, status: res.status, data }
   } catch (err) {

@@ -17,8 +17,13 @@ contextBridge.exposeInMainWorld('electron', {
   // Auto launch
   setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
-  // Chat API proxy (routes through Node.js to avoid renderer CORS)
+  // Chat API — 通过本地代理服务器转发（渲染进程无需持有 API Key）
   chatMessage: (p) => ipcRenderer.invoke('chat-message', p),
+  // ── 本地代理服务器 ──────────────────────────────────────────────────────
+  getProxyPort: () => ipcRenderer.invoke('get-proxy-port'),
+  getProxyConfig: () => ipcRenderer.invoke('get-proxy-config'),
+  saveProxyConfig: (p) => ipcRenderer.invoke('save-proxy-config', p),
+  testProxyProvider: (p) => ipcRenderer.invoke('test-proxy-provider', p),
   // Agent Hub (多 Agent 支持)
   checkAvailableAgents: () => ipcRenderer.invoke('agent:check-available'),
   testAgent: (params) => ipcRenderer.invoke('agent:test', params),

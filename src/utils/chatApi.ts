@@ -1,11 +1,13 @@
 /**
  * Chat 模式 API 调用工具
  *
- * 路由策略（解决浏览器/Electron dev 模式的 CORS 问题）：
- *  - 真实 Electron 环境：通过 IPC `chat-message` 由 Node.js 主进程发起请求，天然无 CORS
- *  - 浏览器 / Electron dev 模式（带 Vite dev server）：走 Vite proxy 路径，由 dev server 转发
+ * 路由策略：
+ *  - 真实 Electron 环境：通过 IPC `chat-message` 由主进程代理服务器转发，
+ *    渲染进程无需持有 API Key
+ *  - 浏览器 / Electron dev 模式：走 Vite proxy 路径（`/api-proxy/...`），
+ *    dev 阶段允许在 localStorage 中临时存储 Key 以方便调试
  *
- * 支持：MiniMax（Anthropic 兼容接口）、Qwen（OpenAI 兼容接口）
+ * 支持：MiniMax（OpenAI 兼容接口）、Qwen（OpenAI 兼容接口）、Claude（Anthropic）
  */
 
 export interface ChatMessage {
@@ -14,11 +16,15 @@ export interface ChatMessage {
 }
 
 function isMiniMax(model: string) {
-  return model.toLowerCase().includes('minimax')
+  return model.toLowerCase().includes('minimax') || model.toLowerCase().includes('minimaxi')
 }
 
 function isQwen(model: string) {
   return model.toLowerCase().includes('qwen') || model.toLowerCase().includes('qwq')
+}
+
+function isClaude(model: string) {
+  return model.toLowerCase().includes('claude')
 }
 
 /** 检测是否在真实 Electron 环境（非 browser mock） */
@@ -29,118 +35,85 @@ function isRealElectron(): boolean {
 
 /**
  * 发送单轮对话请求，返回 assistant 回复文本。
- * 抛出错误时调用方负责显示。
+ * 渲染进程无需传入 apiKey，由代理服务器/主进程统一管理。
+ * _apiKey 参数保留以保持调用签名兼容性（browser dev 模式下仍可用）。
  */
 export async function sendChatMessage(
+  _apiKey: string,
+  model: string,
+  messages: ChatMessage[]
+): Promise<string> {
+  if (!isMiniMax(model) && !isQwen(model) && !isClaude(model)) {
+    throw new Error(
+      `Chat 模式目前支持 MiniMax、Qwen 和 Claude 模型。当前模型：${model}`
+    )
+  }
+
+  // ── Electron 真实环境：通过 IPC 走代理服务器，无 API Key 传输 ──────────────
+  if (isRealElectron()) {
+    return callViaIpc(model, messages)
+  }
+
+  // ── 浏览器 / Electron dev：走 Vite proxy（临时调试方案）────────────────────
+  return callViaBrowserProxy(_apiKey, model, messages)
+}
+
+// ── IPC 代理调用（Electron 生产模式）──────────────────────────────────────────
+
+async function callViaIpc(model: string, messages: ChatMessage[]): Promise<string> {
+  const result = await (window as any).electron.chatMessage({ model, messages })
+
+  if (!result.ok) {
+    throw new Error(
+      `API 错误 (${result.status ?? 'network'}): ` +
+      (result.data?.error?.message ?? result.error ?? '未知错误')
+    )
+  }
+
+  // 统一从 OpenAI 格式响应中取 content
+  const choice = result.data?.choices?.[0]
+  return choice?.message?.content ?? ''
+}
+
+// ── 浏览器代理调用（开发调试，Vite proxy 转发） ───────────────────────────────
+
+async function callViaBrowserProxy(
   apiKey: string,
   model: string,
   messages: ChatMessage[]
 ): Promise<string> {
-  if (!apiKey) {
-    throw new Error('请先在设置 → 通用中填写 API Key')
-  }
+  let url: string
+  let headers: Record<string, string>
 
   if (isMiniMax(model)) {
-    return callMiniMax(apiKey, model, messages)
-  }
-
-  if (isQwen(model)) {
-    return callQwen(apiKey, model, messages)
-  }
-
-  throw new Error(
-    `Chat 模式目前支持 MiniMax 和 Qwen 模型。` +
-    `如需使用 Claude，请切换到 Code 模式（仅 Electron）。`
-  )
-}
-
-// ─── MiniMax Anthropic 兼容接口 ───────────────────────────────────────────────
-
-async function callMiniMax(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-  const body = {
-    model,
-    max_tokens: 8096,
-    messages: messages
-      .filter(m => m.role !== 'system')
-      .map(m => ({ role: m.role, content: m.content })),
-  }
-
-  // 真实 Electron：通过 IPC，由 Node.js 主进程发起请求（无 CORS）
-  if (isRealElectron()) {
-    const result = await (window as any).electron.chatMessage({
-      provider: 'minimax',
-      apiKey,
-      model,
-      messages,
-    })
-    if (!result.ok) {
-      throw new Error(`MiniMax API 错误 (${result.status ?? 'network'}): ${result.data?.error?.message ?? result.error ?? '未知错误'}`)
+    url = '/api-proxy/minimax/v1/text/chatcompletion_v2'
+    headers = {
+      'Content-Type'  : 'application/json',
+      'Authorization' : `Bearer ${apiKey}`,
     }
-    return (
-      result.data.content
-        ?.filter((b: any) => b.type === 'text')
-        .map((b: any) => b.text as string)
-        .join('') ?? ''
-    )
-  }
-
-  // 浏览器 / Electron dev：走 Vite dev server 代理（绕过 CORS）
-  const res = await fetch('/api-proxy/minimax/anthropic/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as any
-    throw new Error(`MiniMax API 错误 (${res.status}): ${err.error?.message ?? res.statusText}`)
-  }
-
-  const data = await res.json() as any
-  return (
-    data.content
-      ?.filter((b: any) => b.type === 'text')
-      .map((b: any) => b.text as string)
-      .join('') ?? ''
-  )
-}
-
-// ─── Qwen DashScope OpenAI 兼容接口 ──────────────────────────────────────────
-
-async function callQwen(apiKey: string, model: string, messages: ChatMessage[]): Promise<string> {
-  // 真实 Electron：通过 IPC，由 Node.js 主进程发起请求（无 CORS）
-  if (isRealElectron()) {
-    const result = await (window as any).electron.chatMessage({
-      provider: 'qwen',
-      apiKey,
-      model,
-      messages,
-    })
-    if (!result.ok) {
-      throw new Error(`Qwen API 错误 (${result.status ?? 'network'}): ${result.data?.error?.message ?? result.error ?? '未知错误'}`)
+  } else if (isQwen(model)) {
+    url = '/api-proxy/qwen/compatible-mode/v1/chat/completions'
+    headers = {
+      'Content-Type'  : 'application/json',
+      'Authorization' : `Bearer ${apiKey}`,
     }
-    return result.data.choices?.[0]?.message?.content ?? ''
+  } else {
+    throw new Error('Claude 模型在 Web 端需要后端代理服务器，请在 Electron 桌面版中使用。')
   }
 
-  // 浏览器 / Electron dev：走 Vite dev server 代理
-  const res = await fetch('/api-proxy/qwen/compatible-mode/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await fetch(url, {
+    method  : 'POST',
+    headers,
+    body    : JSON.stringify({
       model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
+      max_tokens: 8096,
     }),
   })
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as any
-    throw new Error(`Qwen API 错误 (${res.status}): ${err.error?.message ?? res.statusText}`)
+    throw new Error(`API 错误 (${res.status}): ${err.error?.message ?? res.statusText}`)
   }
 
   const data = await res.json() as any

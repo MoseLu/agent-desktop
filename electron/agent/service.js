@@ -1,6 +1,7 @@
 'use strict'
 
-const AgentLoop = require('./loop')
+const AgentLoop  = require('./loop')
+const ProxyConfig = require('../proxy/config')
 
 /**
  * AgentService — 管理多个并发 Agent 会话，每个 conversationId 独立隔离。
@@ -14,11 +15,24 @@ class AgentService {
   }
 
   _getConfig() {
-    return {
-      apiKey:   this.store.get('apiKey',   ''),
-      model:    this.store.get('model',    'claude-sonnet-4-20250514'),
-      maxSteps: this.store.get('maxSteps', 50),
+    const model    = this.store.get('model', 'claude-sonnet-4-20250514')
+    const proxyCfg = new ProxyConfig(this.store)
+
+    // 根据模型名选择对应 provider 的 API Key（从代理配置读取，不经由渲染进程）
+    let apiKey = ''
+    const m = (model || '').toLowerCase()
+    if (m.includes('minimax') || m.includes('minimaxi')) {
+      apiKey = proxyCfg.get('minimax')?.apiKey || ''
+    } else if (m.includes('qwen') || m.includes('qwq')) {
+      apiKey = proxyCfg.get('qwen')?.apiKey || ''
+    } else if (m.includes('claude')) {
+      apiKey = proxyCfg.get('anthropic')?.apiKey || ''
+    } else {
+      // 回退到旧版单一 apiKey 字段（向后兼容）
+      apiKey = this.store.get('apiKey', '')
     }
+
+    return { apiKey, model, maxSteps: this.store.get('maxSteps', 50) }
   }
 
   /**
@@ -29,7 +43,7 @@ class AgentService {
    */
   async run(conversationId, { messages, workspace }, onEvent) {
     const { apiKey, model, maxSteps } = this._getConfig()
-    if (!apiKey) return { error: '请先在设置中填写 API Key' }
+    if (!apiKey) return { error: '请先在代理配置中设置对应模型的 API Key' }
 
     // 同一对话已有运行中的 loop → 先停止
     this.stop(conversationId)
