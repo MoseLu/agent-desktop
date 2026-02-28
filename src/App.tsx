@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import type { Settings, Conversation, Message, Tab } from '@types'
+import type { Settings, Conversation, Message, Tab, AppMode } from '@types'
 import { ThemeProvider, useTheme } from '@contexts/ThemeProvider'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
@@ -10,7 +10,7 @@ import SettingsModal from '@modals/SettingsModal'
 import SearchModal from '@modals/SearchModal'
 import { TabBar } from '@components/TabBar'
 import { appConfig } from '@config'
-import { isElectron, callElectron } from '@utils/env'
+import { isElectron, isRealElectron, callElectron } from '@utils/env'
 
 function AppContent() {
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -24,6 +24,9 @@ function AppContent() {
   // 标签栏状态
   const [tabs, setTabs] = useState<Tab[]>([{ id: 'default', title: appConfig.appName, isDefault: true }])
   const [activeTabId, setActiveTabId] = useState<string>('default')
+
+  // 应用模式：chat（浏览器/桌面均支持）/ code（仅 Electron）
+  const [mode, setMode] = useState<AppMode>('chat')
 
   useEffect(() => {
     // 使用环境变量检测并获取设置
@@ -350,6 +353,9 @@ function AppContent() {
         onSelect={switchTab}
         onClose={closeTab}
         onNewTab={createNewTab}
+        mode={mode}
+        onModeChange={setMode}
+        isRealElectron={isRealElectron()}
       />
 
       <div style={styles.contentWrapper}>
@@ -374,6 +380,7 @@ function AppContent() {
               key={activeId!}
               conversation={activeConv}
               settings={settings}
+              mode={mode}
               onUpdate={(updater) => updateConv(activeId!, updater)}
               branchConversations={getBranchFamily(activeId!)}
               onCreateBranch={() => createBranch(activeId!)}

@@ -65,6 +65,9 @@ export interface AgentEvent {
   [key: string]: unknown
 }
 
+/** chat = 纯对话，浏览器/桌面均支持；code = 完整 agent，仅 Electron */
+export type AppMode = 'chat' | 'code'
+
 declare global {
   interface Window {
     electron: {

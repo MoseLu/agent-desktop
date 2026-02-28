@@ -1,6 +1,7 @@
 /**
  * TabBar 组件类型定义
  */
+import type { AppMode } from '@types'
 
 export interface Tab {
   id: string
@@ -14,7 +15,13 @@ export interface TabBarProps {
   activeTabId: string
   onSelect: (tabId: string) => void
   onClose: (tabId: string) => void
-  onNewTab?: () => void  // 新建标签回调
+  onNewTab?: () => void
+  /** 当前应用模式 */
+  mode: AppMode
+  /** 切换模式回调（仅真实 Electron 可切到 code） */
+  onModeChange: (mode: AppMode) => void
+  /** 是否为真实 Electron 环境（决定 Code 按钮是否可用） */
+  isRealElectron: boolean
 }
 
 export interface TabItemProps {

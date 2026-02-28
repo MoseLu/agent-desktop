@@ -31,6 +31,14 @@ export function isElectron(): boolean {
 }
 
 /**
+ * 判断是否在真实 Electron 环境（而非浏览器 mock）中运行。
+ * 浏览器中 electron-mock 会设置 __isMock 标记以区分。
+ */
+export function isRealElectron(): boolean {
+  return isElectron() && !(window.electron as any).__isMock
+}
+
+/**
  * 判断是否在浏览器开发模式中运行
  * 
  * @example

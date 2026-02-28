@@ -191,45 +191,11 @@ const createMockElectron = (): ElectronAPI => {
       return path ?? null
     },
 
-    agentRun: async ({ messages }) => {
-      stopRequested = false
-      const { apiKey, model } = settings
-
-      if (!apiKey) {
-        const errMsg = '请先在设置 → 通用中填写 API Key'
-        emitAgentEvent({ type: 'error', message: errMsg })
-        return { error: errMsg }
-      }
-
-      emitAgentEvent({ type: 'start', workspace: settings.workspace })
-      emitAgentEvent({ type: 'step', step: 1, maxSteps: 1 })
-
-      try {
-        let responseText = ''
-
-        if (isMiniMaxModel(model)) {
-          responseText = await callMiniMaxAPI(apiKey, model, messages)
-        } else if (isQwenModel(model)) {
-          responseText = await callQwenAPI(apiKey, model, messages)
-        } else {
-          throw new Error(`浏览器模式不支持 Claude 原生 API，请在设置中切换为 MiniMax 或 Qwen 模型`)
-        }
-
-        if (stopRequested) {
-          emitAgentEvent({ type: 'stopped' })
-          return { result: {} }
-        }
-
-        if (responseText) {
-          emitAgentEvent({ type: 'text', text: responseText })
-        }
-        emitAgentEvent({ type: 'done', text: responseText, steps: 1 })
-        return { result: { content: responseText } }
-      } catch (error) {
-        const errMsg = (error as Error).message
-        emitAgentEvent({ type: 'error', message: errMsg })
-        return { error: errMsg }
-      }
+    // 浏览器模式下 Code 模式不可用；Chat 模式直接用 chatApi.ts，不走此处
+    agentRun: async () => {
+      const errMsg = 'Code 模式仅在 Electron 桌面端可用'
+      emitAgentEvent({ type: 'error', message: errMsg })
+      return { error: errMsg }
     },
 
     agentStop: async () => {
@@ -266,7 +232,10 @@ const createMockElectron = (): ElectronAPI => {
 
 // 仅在浏览器中且 window.electron 不存在时注入 mock
 if (typeof window !== 'undefined' && !(window as any).electron) {
-  (window as any).electron = createMockElectron()
+  const mock = createMockElectron()
+  // 标记为 mock，供 isRealElectron() 判断（区分真实 Electron 和浏览器）
+  ;(mock as any).__isMock = true
+  ;(window as any).electron = mock
 } else if (typeof window !== 'undefined') {
   console.log('[Electron] 使用真实 Electron API')
 }

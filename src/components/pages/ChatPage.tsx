@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import type { Settings, Conversation, Message, AgentEvent, ToolEvent } from '@types'
+import type { Settings, Conversation, Message, AgentEvent, ToolEvent, AppMode } from '@types'
 import IconButton from '@ui/IconButton'
 import Tooltip from '@ui/Tooltip'
 import ChatInput from '@ui/ChatInput'
@@ -12,7 +12,8 @@ import {
   OmnipotentModeIcon as OmnipotentIcon,
 } from '@ui/icons'
 import { ArrowUpOutlined } from '@ant-design/icons'
-import { isElectron, callElectron } from '@utils/env'
+import { isElectron, isRealElectron } from '@utils/env'
+import { sendChatMessage } from '@utils/chatApi'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatRelativeTime(date: Date): string {
@@ -29,13 +30,14 @@ function formatRelativeTime(date: Date): string {
 interface Props {
   conversation: Conversation
   settings: Settings
+  mode: AppMode
   onUpdate: (updater: (c: Conversation) => Partial<Conversation>) => void
   branchConversations?: Conversation[]
   onCreateBranch?: () => void
   onSelectConversation?: (id: string) => void
 }
 
-export default function ChatPage({ conversation, settings, onUpdate, branchConversations, onCreateBranch, onSelectConversation }: Props) {
+export default function ChatPage({ conversation, settings, mode, onUpdate, branchConversations, onCreateBranch, onSelectConversation }: Props) {
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
@@ -117,16 +119,14 @@ export default function ChatPage({ conversation, settings, onUpdate, branchConve
     }
   }, [onUpdate])
 
+  // Code 模式（Electron）才注册 agent 事件监听器
   useEffect(() => {
-    if (!isElectron()) {
-      // 浏览器模式下不注册事件监听器
-      return
-    }
+    if (mode !== 'code' || !isRealElectron()) return
 
     const cleanup = window.electron.onAgentEvent(handleAgentEvent)
     cleanupRef.current = cleanup
     return () => cleanup()
-  }, [handleAgentEvent])
+  }, [handleAgentEvent, mode])
 
   useEffect(() => {
     if (!showHistory) return
@@ -153,8 +153,43 @@ export default function ChatPage({ conversation, settings, onUpdate, branchConve
       onUpdate(() => ({ title: content.slice(0, 30) }))
     }
 
-    if (!isElectron()) {
-      console.log('[Browser Mode] Agent run not available')
+    // ─── Chat 模式：直接调 API，浏览器 / Electron 均可 ──────────────────────
+    if (mode === 'chat') {
+      try {
+        const text = await sendChatMessage(
+          settings.apiKey,
+          settings.model,
+          updated.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+        )
+        onUpdate(conv => {
+          const msgs = [...conv.messages]
+          msgs.push({ role: 'assistant', content: text, events: [] })
+          const firstUser = msgs.find(m => m.role === 'user')
+          return { messages: msgs, title: firstUser?.content.slice(0, 30) ?? '对话' }
+        })
+      } catch (err) {
+        const errMsg = (err as Error).message
+        onUpdate(conv => ({
+          messages: [
+            ...conv.messages,
+            { role: 'assistant', content: `⚠️ ${errMsg}`, error: true, events: [] },
+          ],
+        }))
+      }
+      setIsRunning(false)
+      setStatusText('')
+      return
+    }
+
+    // ─── Code 模式：Electron agent loop（含工具调用） ────────────────────────
+    if (!isRealElectron()) {
+      // 不应该到这里（TabBar 已禁用 Code 模式），保底提示
+      onUpdate(conv => ({
+        messages: [
+          ...conv.messages,
+          { role: 'assistant', content: '⚠️ Code 模式仅在 Electron 桌面版中可用。', error: true, events: [] },
+        ],
+      }))
       setIsRunning(false)
       setStatusText('')
       return
@@ -245,21 +280,24 @@ export default function ChatPage({ conversation, settings, onUpdate, branchConve
           value={input}
           onChange={setInput}
           onSubmit={sendMessage}
-          placeholder="继续输入任务..."
+          placeholder={mode === 'chat' ? '输入消息...' : '输入任务...'}
           disabled={isRunning}
           renderToolbar={() => (
             <ChatInputToolbar
-              leftContent={(
-                <IconButton 
-                  variant="bordered" 
-                  icon={<AttachIcon />} 
-                  title="上传文件"
-                />
-              )}
+              leftContent={
+                // Code 模式才显示文件附件按钮
+                mode === 'code' ? (
+                  <IconButton
+                    variant="bordered"
+                    icon={<AttachIcon />}
+                    title="上传文件"
+                  />
+                ) : null
+              }
               rightContent={(
                 <>
-                  {/* 简洁模式：只显示路径和模式，不可更改 */}
-                  {isElectron() && (
+                  {/* Code 模式才显示工作目录 */}
+                  {mode === 'code' && isRealElectron() && (
                     <>
                       <div style={styles.statusItem}>
                         <FolderIcon size={14} />
@@ -268,19 +306,12 @@ export default function ChatPage({ conversation, settings, onUpdate, branchConve
                       <div style={styles.divider} />
                     </>
                   )}
-                  <div style={styles.modeItem}>
-                    {isSmartMode ? (
-                      <>
-                        <OmnipotentIcon size={16} />
-                        <span style={styles.modeText}>全能</span>
-                      </>
-                    ) : (
-                      <>
-                        <LightningIcon size={16} />
-                        <span style={styles.modeText}>快速</span>
-                      </>
-                    )}
-                  </div>
+
+                  {/* Chat 模式显示当前模型名 */}
+                  {mode === 'chat' && settings.model && (
+                    <span style={styles.modelName}>{settings.model}</span>
+                  )}
+
                   <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
                     <button
                       onClick={() => sendMessage()}

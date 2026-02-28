@@ -115,6 +115,46 @@ export const styles: Record<string, CSSProperties> = {
   newTabBtnHover: {
     background: 'var(--hover-bg)',
     color: 'var(--text-primary)',
-    border: '1px solid var(--border-dark)', // hover 时变为实线
+    border: '1px solid var(--border-dark)',
+  },
+  // ─── 模式切换器（顶栏右侧）
+  modeSwitcherWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    paddingRight: 12,
+    paddingLeft: 8,
+    flexShrink: 0,
+    marginLeft: 'auto',
+  },
+  modeSwitcher: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-medium)',
+    borderRadius: 8,
+    padding: 3,
+  },
+  modeBtn: {
+    padding: '3px 12px',
+    borderRadius: 6,
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+    fontFamily: 'inherit',
+    lineHeight: '18px',
+  },
+  modeBtnActive: {
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  },
+  modeBtnDisabled: {
+    opacity: 0.38,
+    cursor: 'not-allowed',
   },
 }
