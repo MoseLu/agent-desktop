@@ -18,10 +18,36 @@ const SYSTEM_PROMPT = `你是一个强大的桌面 AI 助手，直接运行在�
 
 当前运行平台：${process.platform}`
 
+// 判断是否使用 MiniMax API
+function isMiniMaxModel(model) {
+  return model && (model.includes('MiniMax') || model.includes('minimax'))
+}
+
+// 获取 API 配置
+function getAPIConfig(apiKey, model) {
+  if (isMiniMaxModel(model)) {
+    return {
+      apiKey,
+      baseURL: 'https://api.minimaxi.com/anthropic',
+      model: model || 'MiniMax-M2.5'
+    }
+  }
+  return {
+    apiKey,
+    model: model || 'claude-sonnet-4-20250514'
+  }
+}
+
 class AgentLoop {
   constructor({ apiKey, model, workspace, maxSteps, onEvent }) {
-    this.client = new Anthropic({ apiKey })
-    this.model = model
+    const config = getAPIConfig(apiKey, model)
+    
+    // MiniMax 使用 Anthropic 兼容接口
+    this.client = new Anthropic({ 
+      apiKey: config.apiKey,
+      ...(config.baseURL && { baseURL: config.baseURL })
+    })
+    this.model = config.model
     this.workspace = workspace
     this.maxSteps = maxSteps
     this.onEvent = onEvent

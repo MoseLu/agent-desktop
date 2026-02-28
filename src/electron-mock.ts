@@ -93,22 +93,62 @@ const createMockElectron = (): ElectronAPI => {
     },
     
     agentRun: async ({ messages, workspace }) => {
-      console.log('[Mock] Agent run called with:', { messages, workspace });
-      // Simulate an agent run that processes the message
+      console.log('[MiniMax] Agent run called with:', { messages, workspace });
+      
+      // Load settings to get API key and model
       try {
-        // Simulate some processing and a fake response
+        const stored = localStorage.getItem(SETTINGS_KEY);
+        const settings = stored ? JSON.parse(stored) : null;
+        const apiKey = settings?.apiKey || '';
+        const model = settings?.model || 'MiniMax-M2.5';
+        
+        if (!apiKey) {
+          return { error: '请先在设置中填写 MiniMax API Key' };
+        }
+        
+        // Call MiniMax Anthropic-compatible API
+        const baseUrl = 'https://api.minimaxi.com/anthropic';
+        const response = await fetch(`${baseUrl}/v1/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey
+          },
+          body: JSON.stringify({
+            model: model,
+            max_tokens: 8096,
+            messages: messages.map(m => ({
+              role: m.role,
+              content: m.content
+            }))
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          return { 
+            error: `MiniMax API error (${response.status}): ${errorData.error?.message || response.statusText}` 
+          };
+        }
+        
+        const data = await response.json();
+        
+        // Extract text content from response
+        const textContent = data.content
+          ?.filter((block: any) => block.type === 'text')
+          ?.map((block: any) => block.text)
+          ?.join('\n') || '';
+        
         return {
           result: {
-            content: `[MOCK] 假设这是对 "${messages[messages.length - 1]?.content || '您的消息'}" 的处理结果。实际的 agent 运行需要在 Electron 环境中进行。`,
+            content: textContent,
             status: 'completed',
-            execution_log: [
-              { tool: 'mock_tool1', input: {}, result: { success: true } },
-              { tool: 'mock_tool2', input: {}, result: { success: false } }
-            ]
+            model: model,
+            usage: data.usage
           }
         };
       } catch (error) {
-        return { error: 'Mock agent runtime error: ' + (error as Error).message };
+        return { error: 'MiniMax API call failed: ' + (error as Error).message };
       }
     },
     
