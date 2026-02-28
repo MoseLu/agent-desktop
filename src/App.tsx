@@ -12,25 +12,6 @@ import { TabBar } from '@components/TabBar'
 import { appConfig } from '@config'
 import { isElectron, callElectron } from '@utils/env'
 
-const DEFAULT_SETTINGS: Settings = {
-  apiKey: '',
-  workspace: '',
-  model: 'qwen3-coder-next',
-  maxSteps: 10,
-  userName: '开发者',
-  userPlan: 'free',
-  userAvatar: '',
-  theme: 'system',
-  language: 'zh-CN',
-  autoOpenTask: false,
-  desktopNotifications: false,
-  taskCompleteNotify: false,
-  soundNotify: false,
-  showInMenuBar: true,
-  autoStart: false,
-  shortcut: 'Alt+A',
-}
-
 function AppContent() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -52,12 +33,55 @@ function AppContent() {
       try {
         const stored = localStorage.getItem('app-settings')
         const savedSettings = stored ? JSON.parse(stored) : null
-        const merged = savedSettings ? { ...DEFAULT_SETTINGS, ...savedSettings } : DEFAULT_SETTINGS
-        setSettings(merged)
-        setTheme(merged.theme || 'system')
+        
+        const defaultSettings: Settings = {
+          apiKey: '',
+          workspace: '',
+          model: 'qwen3-coder-next',
+          maxSteps: 10,
+          userName: '开发者',
+          userPlan: 'free',
+          userAvatar: '',
+          theme: 'system',
+          language: 'zh-CN',
+          autoOpenTask: false,
+          desktopNotifications: false,
+          taskCompleteNotify: false,
+          soundNotify: false,
+          showInMenuBar: true,
+          autoStart: false,
+          shortcut: 'Alt+A',
+        }
+        
+        // 合并保存的设置和默认设置
+        const settings = savedSettings 
+          ? { ...defaultSettings, ...savedSettings }
+          : defaultSettings
+        
+        setSettings(settings)
+        setTheme(settings.theme || 'system')
       } catch (err) {
         console.error('Failed to load settings from localStorage:', err)
-        setSettings(DEFAULT_SETTINGS)
+        // 使用默认设置
+        const defaultSettings: Settings = {
+          apiKey: '',
+          workspace: '',
+          model: 'qwen3-coder-next',
+          maxSteps: 10,
+          userName: '开发者',
+          userPlan: 'free',
+          userAvatar: '',
+          theme: 'system',
+          language: 'zh-CN',
+          autoOpenTask: false,
+          desktopNotifications: false,
+          taskCompleteNotify: false,
+          soundNotify: false,
+          showInMenuBar: true,
+          autoStart: false,
+          shortcut: 'Alt+A',
+        }
+        setSettings(defaultSettings)
         setTheme('system')
       }
       return
@@ -253,27 +277,47 @@ function AppContent() {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...updater(c) } : c))
   }, [])
 
-  /**
-   * 从 sourceId 对话的第 atIndex 条消息处（含）创建分支会话，并在新 Tab 中打开。
-   */
-  const branchConversation = useCallback((sourceId: string, atIndex: number) => {
-    const source = conversations.find(c => c.id === sourceId)
-    if (!source) return
-
-    const id = Date.now().toString()
-    const tabId = `tab-${Date.now() + 1}`
-    const conv: Conversation = {
-      id,
-      title: '新会话',
-      messages: source.messages.slice(0, atIndex + 1),
-      createdAt: new Date(),
-      tabId,
-      parentId: sourceId,
-      branchPoint: atIndex,
+  // 获取同一分支树的所有会话（找到根节点后递归收集所有子节点）
+  const getBranchFamily = useCallback((convId: string): Conversation[] => {
+    let rootId = convId
+    let current = conversations.find(c => c.id === convId)
+    while (current?.parentId) {
+      rootId = current.parentId
+      current = conversations.find(c => c.id === current!.parentId)
     }
+    const result: Conversation[] = []
+    function collect(id: string) {
+      const conv = conversations.find(c => c.id === id)
+      if (conv) result.push(conv)
+      conversations.filter(c => c.parentId === id).forEach(c => collect(c.id))
+    }
+    collect(rootId)
+    return result.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  }, [conversations])
 
-    setConversations(prev => [conv, ...prev])
-    setTabs(prev => [...prev, { id: tabId, title: '新会话', conversationId: id, isDefault: false }])
+  // 从当前会话创建分支会话
+  const createBranch = useCallback((fromConversationId: string) => {
+    const fromConv = conversations.find(c => c.id === fromConversationId)
+    if (!fromConv) return
+
+    const id = `branch-${Date.now()}`
+    const tabId = `tab-${Date.now() + 1}`
+    const branchConv: Conversation = {
+      id,
+      title: `${fromConv.title} · 分支`,
+      messages: fromConv.messages.filter(m => !m.streaming).map(m => ({ ...m })),
+      createdAt: new Date(),
+      parentId: fromConversationId,
+      tabId,
+    }
+    const newTab: Tab = {
+      id: tabId,
+      title: branchConv.title,
+      conversationId: id,
+      isDefault: false,
+    }
+    setConversations(prev => [...prev, branchConv])
+    setTabs(prev => [...prev, newTab])
     setActiveTabId(tabId)
     setActiveId(id)
     setPage('chat')
@@ -331,7 +375,9 @@ function AppContent() {
               conversation={activeConv}
               settings={settings}
               onUpdate={(updater) => updateConv(activeId!, updater)}
-              onBranch={(atIndex) => branchConversation(activeId!, atIndex)}
+              branchConversations={getBranchFamily(activeId!)}
+              onCreateBranch={() => createBranch(activeId!)}
+              onSelectConversation={selectConversation}
             />
           ) : (
             <HomePage

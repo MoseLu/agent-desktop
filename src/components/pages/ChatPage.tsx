@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { Settings, Conversation, Message, AgentEvent, ToolEvent } from '@types'
 import IconButton from '@ui/IconButton'
 import Tooltip from '@ui/Tooltip'
 import ChatInput from '@ui/ChatInput'
 import ChatInputToolbar from '@ui/ChatInputToolbar'
-import ToolbarDropdownMenu from '@ui/ToolbarDropdownMenu'
-import SplitPane from '@ui/SplitPane'
-import PreviewPanel from '@ui/PreviewPanel'
 import {
   AttachIcon,
   FolderIcon,
@@ -14,29 +11,39 @@ import {
   GearIcon,
   OmnipotentModeIcon as OmnipotentIcon,
 } from '@ui/icons'
-import { ArrowUpOutlined, SplitCellsOutlined } from '@ant-design/icons'
+import { ArrowUpOutlined } from '@ant-design/icons'
 import { isElectron, callElectron } from '@utils/env'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatRelativeTime(date: Date): string {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins} 分钟前`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} 天前`
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
 
 interface Props {
   conversation: Conversation
   settings: Settings
   onUpdate: (updater: (c: Conversation) => Partial<Conversation>) => void
-  onBranch: (atIndex: number) => void
+  branchConversations?: Conversation[]
+  onCreateBranch?: () => void
+  onSelectConversation?: (id: string) => void
 }
 
-export default function ChatPage({ conversation, settings, onUpdate, onBranch }: Props) {
+export default function ChatPage({ conversation, settings, onUpdate, branchConversations, onCreateBranch, onSelectConversation }: Props) {
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [isSmartMode, setIsSmartMode] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [rightPanel, setRightPanel] = useState<
-    | null
-    | { mode: 'tool'; event: ToolEvent }
-    | { mode: 'files'; events: ToolEvent[] }
-  >(null)
+  const [showHistory, setShowHistory] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
+  const historyPanelRef = useRef<HTMLDivElement>(null)
 
   const messages = conversation.messages
 
@@ -45,8 +52,6 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
   }, [messages])
 
   const handleAgentEvent = useCallback((ev: AgentEvent) => {
-    // 只处理属于本对话的事件，防止多标签并发时串扰
-    if (ev.conversationId !== conversation.id) return
     switch (ev.type) {
       case 'step':
         setStatusText(`步骤 ${ev.step} / ${ev.maxSteps}`)
@@ -56,9 +61,9 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
           const msgs = [...conv.messages]
           const last = msgs[msgs.length - 1]
           if (last?.role === 'assistant' && last.streaming) {
-            msgs[msgs.length - 1] = { ...last, content: last.content + ev.text }
+            msgs[msgs.length - 1] = { ...last, content: last.content + (ev.text as string) }
           } else {
-            msgs.push({ role: 'assistant', content: ev.text, streaming: true, events: [] })
+            msgs.push({ role: 'assistant', content: ev.text as string, streaming: true, events: [] })
           }
           return { messages: msgs }
         })
@@ -68,7 +73,7 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
         onUpdate(conv => {
           const msgs = [...conv.messages]
           const last = msgs[msgs.length - 1]
-          const toolEv: ToolEvent = { type: 'tool_start', id: ev.id, name: ev.name, input: ev.input }
+          const toolEv: ToolEvent = { type: 'tool_start', id: ev.id as string, name: ev.name as string, input: ev.input as Record<string, unknown> }
           if (last?.role === 'assistant') {
             msgs[msgs.length - 1] = { ...last, events: [...(last.events ?? []), toolEv] }
           } else {
@@ -83,7 +88,7 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
           const last = msgs[msgs.length - 1]
           if (last?.role === 'assistant') {
             const events = (last.events ?? []).map(e =>
-              e.id === ev.id ? { ...e, type: 'tool_result' as const, result: ev.result, duration: ev.duration, isError: ev.isError } : e
+              e.id === ev.id ? { ...e, type: 'tool_result' as const, result: ev.result as Record<string, unknown>, duration: ev.duration as number, isError: ev.isError as boolean } : e
             )
             msgs[msgs.length - 1] = { ...last, events }
           }
@@ -117,11 +122,22 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
       // 浏览器模式下不注册事件监听器
       return
     }
-    
+
     const cleanup = window.electron.onAgentEvent(handleAgentEvent)
     cleanupRef.current = cleanup
     return () => cleanup()
   }, [handleAgentEvent])
+
+  useEffect(() => {
+    if (!showHistory) return
+    const handler = (e: MouseEvent) => {
+      if (historyPanelRef.current && !historyPanelRef.current.contains(e.target as Node)) {
+        setShowHistory(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showHistory])
 
   const sendMessage = async (content = input.trim()) => {
     if (!content || isRunning) return
@@ -145,7 +161,6 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
     }
 
     const result = await window.electron.agentRun({
-      conversationId: conversation.id,
       messages: updated.map(m => ({ role: m.role, content: m.content })),
       workspace: settings.workspace,
     })
@@ -158,40 +173,63 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
 
   const workspaceName = settings.workspace || '未设置工作目录'
 
-  const chatColumn = (
-    <div style={styles.chatColumn}>
-      {/* 顶部栏：右侧放分支按钮 */}
-      <div style={styles.chatHeader}>
-        <Tooltip title="基于当前会话创建分支" position="bottom">
-          <button
-            style={styles.branchHeaderBtn}
-            onClick={() => onBranch(messages.length - 1)}
-            disabled={messages.length === 0}
-          >
-            <BranchIcon />
-            <span>分支会话</span>
-          </button>
-        </Tooltip>
+  return (
+    <div style={styles.page}>
+      {/* 右上角悬浮操作按钮 */}
+      <div ref={historyPanelRef} style={floatStyles.container}>
+        <button
+          style={floatStyles.btn}
+          title="创建分支会话"
+          onClick={() => onCreateBranch?.()}
+        >
+          <PlusIcon />
+        </button>
+        <button
+          style={{ ...floatStyles.btn, ...(showHistory ? floatStyles.btnActive : {}) }}
+          title="分支历史"
+          onClick={() => setShowHistory(p => !p)}
+        >
+          <HistoryIcon />
+        </button>
+
+        {showHistory && (
+          <div style={floatStyles.panel}>
+            <div style={floatStyles.panelHeader}>分支历史</div>
+            <div style={floatStyles.list}>
+              {(branchConversations ?? []).map(conv => {
+                const isCurrent = conv.id === conversation.id
+                return (
+                  <button
+                    key={conv.id}
+                    style={{ ...floatStyles.item, ...(isCurrent ? floatStyles.itemActive : {}) }}
+                    onClick={() => { onSelectConversation?.(conv.id); setShowHistory(false) }}
+                  >
+                    <span style={floatStyles.itemTitle}>{conv.title}</span>
+                    <span style={floatStyles.itemMeta}>
+                      {isCurrent ? 'Current Chat' : formatRelativeTime(conv.createdAt)}
+                    </span>
+                  </button>
+                )
+              })}
+              {(!branchConversations || branchConversations.length === 0) && (
+                <div style={floatStyles.empty}>暂无历史记录</div>
+              )}
+            </div>
+            <div style={floatStyles.panelDivider} />
+            <button
+              style={floatStyles.createBtn}
+              onClick={() => { onCreateBranch?.(); setShowHistory(false) }}
+            >
+              <PlusIcon size={12} />
+              <span>创建分支会话</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={styles.messages}>
-        {/* 分支来源提示 */}
-        {conversation.parentId && (
-          <div style={styles.branchBanner}>
-            <BranchIcon />
-            <span>此会话从第 {(conversation.branchPoint ?? 0) + 1} 条消息处分叉</span>
-          </div>
-        )}
         {messages.map((msg, i) => (
-          <MessageBubble
-            key={i}
-            message={msg}
-            messageIndex={i}
-            selectedToolId={rightPanel?.mode === 'tool' ? rightPanel.event.id : null}
-            onSelectTool={event => { setRightPanel({ mode: 'tool', event }); setShowPreview(false) }}
-            onShowFiles={events => { setRightPanel({ mode: 'files', events }); setShowPreview(false) }}
-            onBranch={onBranch}
-          />
+          <MessageBubble key={i} message={msg} />
         ))}
         {isRunning && statusText && (
           <div style={styles.statusRow}>
@@ -212,14 +250,11 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
           renderToolbar={() => (
             <ChatInputToolbar
               leftContent={(
-                <>
-                  <IconButton
-                    variant="bordered"
-                    icon={<AttachIcon />}
-                    title="上传文件"
-                  />
-                  <ToolbarDropdownMenu />
-                </>
+                <IconButton 
+                  variant="bordered" 
+                  icon={<AttachIcon />} 
+                  title="上传文件"
+                />
               )}
               rightContent={(
                 <>
@@ -246,19 +281,6 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
                       </>
                     )}
                   </div>
-                  {/* Preview panel toggle */}
-                  <Tooltip title={showPreview ? '隐藏预览' : '显示预览'} position="top">
-                    <button
-                      onClick={() => setShowPreview(p => !p)}
-                      style={{
-                        ...styles.previewToggleBtn,
-                        ...(showPreview ? styles.previewToggleBtnActive : {}),
-                      }}
-                    >
-                      <SplitCellsOutlined style={{ fontSize: 15 }} />
-                    </button>
-                  </Tooltip>
-                  <div style={styles.divider} />
                   <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
                     <button
                       onClick={() => sendMessage()}
@@ -279,138 +301,23 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
       </div>
     </div>
   )
-
-  return (
-    <div style={styles.page}>
-      {(rightPanel !== null || showPreview) ? (
-        <SplitPane
-          left={chatColumn}
-          right={
-            rightPanel !== null ? (
-              <ToolDetailPanel
-                panel={rightPanel}
-                onClose={() => setRightPanel(null)}
-                onSelectTool={event => setRightPanel({ mode: 'tool', event })}
-              />
-            ) : (
-              <PreviewPanel
-                messages={messages}
-                workspace={settings.workspace || ''}
-                onClose={() => setShowPreview(false)}
-              />
-            )
-          }
-          defaultLeftPercent={62}
-          minLeft={320}
-          minRight={280}
-        />
-      ) : (
-        chatColumn
-      )}
-    </div>
-  )
 }
-// ─── Tool helpers ─────────────────────────────────────────────────────────────
-const TOOL_NAMES: Record<string, string> = {
-  execute_shell: '命令行执行',
-  read_file: '读取文件',
-  write_file: '写入文件',
-  list_files: '列出文件',
-  search_files: '搜索文件',
-  create_directory: '创建目录',
-  move_file: '移动文件',
-  delete_file: '删除文件',
-}
-
-const FILE_TOOLS = new Set(['read_file', 'write_file', 'list_files', 'search_files', 'create_directory', 'move_file', 'delete_file'])
-
-function getToolSummary(event: ToolEvent): string {
-  const { name, input } = event
-  switch (name) {
-    case 'execute_shell': return (input.command as string) || ''
-    case 'read_file':
-    case 'write_file':
-    case 'list_files':
-    case 'create_directory':
-    case 'delete_file': return (input.path as string) || ''
-    case 'search_files': return (input.directory as string) || (input.path as string) || ''
-    case 'move_file': return `${input.source} → ${input.destination}`
-    default: return ''
-  }
-}
-
-function getResultText(result?: Record<string, unknown>): string {
-  if (!result) return ''
-  if (typeof result.output === 'string') return result.output
-  if (typeof result.stdout === 'string') return result.stdout
-  if (typeof result.content === 'string') return result.content
-  if (typeof result.result === 'string') return result.result
-  if (typeof result.error === 'string') return result.error
-  return JSON.stringify(result, null, 2)
-}
-
 // ─── Message bubble ───────────────────────────────────────────────────────────
-function MessageBubble({ message, messageIndex, selectedToolId, onSelectTool, onShowFiles, onBranch }: {
-  message: Message
-  messageIndex: number
-  selectedToolId: string | null
-  onSelectTool: (event: ToolEvent) => void
-  onShowFiles: (events: ToolEvent[]) => void
-  onBranch: (atIndex: number) => void
-}) {
-  const [hovered, setHovered] = useState(false)
-
+function MessageBubble({ message }: { message: Message }) {
   if (message.role === 'user') {
     return (
-      <div
-        style={msgStyles.userRow}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        {hovered && (
-          <button
-            style={msgStyles.branchBtn}
-            title="从此处创建分支会话"
-            onClick={() => onBranch(messageIndex)}
-          >
-            <BranchIcon />
-          </button>
-        )}
+      <div style={msgStyles.userRow}>
         <div style={msgStyles.userBubble}>
           <p style={msgStyles.userText}>{message.content}</p>
         </div>
       </div>
     )
   }
-
-  const fileEvents = (message.events ?? []).filter(
-    e => e.type === 'tool_result' && FILE_TOOLS.has(e.name)
-  )
-  const showFilesBtn = fileEvents.length > 0 && !message.streaming
-
   return (
     <div style={msgStyles.assistantRow}>
       <div style={msgStyles.avatar}><AvatarIcon /></div>
       <div style={msgStyles.assistantContent}>
-        {message.events?.map(ev => (
-          <ToolBlock
-            key={ev.id}
-            event={ev}
-            isSelected={selectedToolId === ev.id}
-            onSelect={onSelectTool}
-          />
-        ))}
-        {showFilesBtn && (
-          <button
-            style={toolStyles.filesBtn}
-            onClick={() => onShowFiles(fileEvents)}
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-              <path d="M2 4a1 1 0 011-1h3.5l1.5 2H13a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-            </svg>
-            <span>查看此任务中的所有文件 ({fileEvents.length})</span>
-          </button>
-        )}
+        {message.events?.map((ev, i) => <ToolBlock key={i} event={ev} />)}
         {message.content && (
           <div style={msgStyles.text}>
             <SimpleMarkdown text={message.content} />
@@ -422,150 +329,37 @@ function MessageBubble({ message, messageIndex, selectedToolId, onSelectTool, on
   )
 }
 
-function ToolBlock({ event, isSelected, onSelect }: {
-  event: ToolEvent
-  isSelected: boolean
-  onSelect: (event: ToolEvent) => void
-}) {
+function ToolBlock({ event }: { event: ToolEvent }) {
+  const [open, setOpen] = useState(false)
   const isDone = event.type === 'tool_result'
-  const isError = !!event.isError
-  const toolName = TOOL_NAMES[event.name] || event.name
-  const summary = getToolSummary(event)
-
-  const accentColor = isSelected
-    ? '#0094fc'
-    : isDone
-      ? isError ? '#f5222d' : '#52c41a'
-      : '#999'
+  const color = '#888'
 
   return (
-    <button
-      style={{
-        ...toolStyles.block,
-        borderLeftColor: accentColor,
-        background: isSelected ? 'rgba(0,148,252,0.06)' : 'var(--bg-secondary)',
-      }}
-      onClick={() => onSelect(event)}
-    >
-      <span style={toolStyles.statusIcon}>
-        {isDone
-          ? isError ? <ErrorDot /> : <SuccessDot />
-          : <RunningDot />
-        }
-      </span>
-      <span style={{ ...toolStyles.statusLabel, color: isDone ? (isError ? '#f5222d' : '#52c41a') : '#999' }}>
-        {isDone ? (isError ? '失败' : '已完成') : '执行中'}
-      </span>
-      <span style={toolStyles.toolName}>{toolName}</span>
-      {summary && (
-        <span style={toolStyles.summary}>{summary}</span>
-      )}
-      <span style={{ flex: 1 }} />
-      {isDone && event.duration !== undefined && (
-        <span style={toolStyles.duration}>
-          {event.duration < 1000 ? `${event.duration}ms` : `${(event.duration / 1000).toFixed(1)}s`}
-        </span>
-      )}
-      <span style={toolStyles.arrow}>›</span>
-    </button>
-  )
-}
-
-// ─── Tool detail panel ────────────────────────────────────────────────────────
-function ToolDetailPanel({ panel, onClose, onSelectTool }: {
-  panel: { mode: 'tool'; event: ToolEvent } | { mode: 'files'; events: ToolEvent[] }
-  onClose: () => void
-  onSelectTool: (event: ToolEvent) => void
-}) {
-  if (panel.mode === 'files') {
-    return (
-      <div style={detailStyles.panel}>
-        <div style={detailStyles.header}>
-          <span style={detailStyles.headerTitle}>任务文件</span>
-          <button style={detailStyles.closeBtn} onClick={onClose}>×</button>
+    <div style={toolStyles.block}>
+      <button style={{ ...toolStyles.header, borderLeftColor: color }} onClick={() => setOpen(p => !p)}>
+        <span style={toolStyles.icon}>🔧</span>
+        <span style={{ ...toolStyles.name, color }}>{event.name}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isDone && !event.isError && <CheckMark color={color} />}
+          <MiniChevron open={open} />
         </div>
-        <div style={detailStyles.body}>
-          {panel.events.map(ev => {
-            const path = getToolSummary(ev)
-            const tag = TOOL_NAMES[ev.name] || ev.name
-            return (
-              <button key={ev.id} style={detailStyles.fileItem} onClick={() => onSelectTool(ev)}>
-                <span style={detailStyles.fileIcon}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                    <path d="M10 2v4h4" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                  </svg>
-                </span>
-                <span style={detailStyles.filePath}>{path || ev.name}</span>
-                <span style={detailStyles.fileTag}>{tag}</span>
-                <span style={detailStyles.fileArrow}>›</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
-
-  const { event } = panel
-  const isDone = event.type === 'tool_result'
-  const isShell = event.name === 'execute_shell'
-  const toolName = TOOL_NAMES[event.name] || event.name
-  const summary = getToolSummary(event)
-  const resultText = getResultText(event.result)
-
-  return (
-    <div style={detailStyles.panel}>
-      <div style={detailStyles.header}>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={detailStyles.headerTitle}>{toolName}</span>
-          {isDone && event.duration !== undefined && (
-            <span style={detailStyles.headerDuration}>
-              {event.duration < 1000 ? `${event.duration}ms` : `${(event.duration / 1000).toFixed(1)}s`}
-            </span>
-          )}
-          {isDone && (
-            <span style={{ ...detailStyles.headerBadge, background: event.isError ? '#fff1f0' : '#f6ffed', color: event.isError ? '#f5222d' : '#52c41a', border: `1px solid ${event.isError ? '#ffa39e' : '#b7eb8f'}` }}>
-              {event.isError ? '失败' : '已完成'}
-            </span>
-          )}
-        </div>
-        <button style={detailStyles.closeBtn} onClick={onClose}>×</button>
-      </div>
-      <div style={detailStyles.body}>
-        <div style={detailStyles.section}>
-          <div style={detailStyles.sectionLabel}>{isShell ? '命令' : '路径'}</div>
-          <pre style={{ ...detailStyles.code, ...(isShell ? detailStyles.terminal : {}) }}>
-            {isShell ? `$ ${summary}` : summary}
-          </pre>
-        </div>
-        {!isShell && event.input.content != null && (
-          <div style={detailStyles.section}>
-            <div style={detailStyles.sectionLabel}>写入内容</div>
-            <pre style={detailStyles.code}>{String(event.input.content)}</pre>
-          </div>
-        )}
-        {isDone && (
-          <div style={detailStyles.section}>
-            <div style={detailStyles.sectionLabel}>
-              {isShell ? '输出' : event.isError ? '错误信息' : '结果'}
+      </button>
+      {open && (
+        <div style={toolStyles.body}>
+          {event.input && (
+            <div style={toolStyles.section}>
+              <span style={toolStyles.sectionLabel}>INPUT</span>
+              <pre style={toolStyles.code}>{JSON.stringify(event.input, null, 2)}</pre>
             </div>
-            <pre style={{
-              ...detailStyles.code,
-              ...(isShell ? detailStyles.terminal : {}),
-              ...(event.isError ? { color: '#f5222d' } : {}),
-            }}>
-              {resultText || '(无输出)'}
-            </pre>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 function SimpleMarkdown({ text }: { text: string }) {
-  const lines = useMemo(() => text.split('\n'), [text])
+  const lines = text.split('\n')
   return (
     <div>
       {lines.map((line, i) => {
@@ -592,6 +386,23 @@ function ThinkingDots() {
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
+function PlusIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <path d="M7 2V12M2 7H12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function HistoryIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M7 4.5V7L9 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function AvatarIcon() {
   return (
     <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -600,18 +411,6 @@ function AvatarIcon() {
         <path d="M6 7 L9 4 L12 7 L9 10Z" fill="var(--bg-primary)" opacity="0.5" />
       </svg>
     </div>
-  )
-}
-
-function BranchIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ display: 'block' }}>
-      <circle cx="4" cy="3" r="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="4" cy="13" r="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="12" cy="7" r="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M4 4.5V8C4 9.1 4.9 10 6 10H10.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      <path d="M4 11.5V8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
   )
 }
 
@@ -625,12 +424,12 @@ function CheckMark({ color }: { color: string }) {
 
 function MiniChevron({ open }: { open: boolean }) {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
+    <svg 
+      width="12" 
+      height="12" 
+      viewBox="0 0 12 12" 
       fill="none"
-      style={{
+      style={{ 
         transform: `rotate(${open ? '180deg' : '0deg'}`,
         transition: 'transform 0.2s ease',
       }}
@@ -640,66 +439,12 @@ function MiniChevron({ open }: { open: boolean }) {
   )
 }
 
-function SuccessDot() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <circle cx="5" cy="5" r="5" fill="#52c41a" />
-      <path d="M2.5 5L4 6.5L7.5 3.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ErrorDot() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <circle cx="5" cy="5" r="5" fill="#f5222d" />
-      <path d="M3.5 3.5L6.5 6.5M6.5 3.5L3.5 6.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function RunningDot() {
-  return (
-    <span style={{
-      display: 'inline-block',
-      width: 8, height: 8,
-      borderRadius: '50%',
-      background: '#999',
-      animation: 'pulse 1.2s ease-in-out infinite',
-    }} />
-  )
-}
-
 const styles: Record<string, React.CSSProperties> = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden' },
-  chatColumn: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)' },
-  chatHeader: {
-    display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-    padding: '0 20px', height: 44, flexShrink: 0,
-    borderBottom: '1px solid var(--border-light)',
-  },
-  branchHeaderBtn: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '0 12px', height: 32,
-    border: '1px solid var(--border-medium)', borderRadius: 8,
-    background: 'transparent', cursor: 'pointer',
-    color: 'var(--text-secondary)', fontSize: 13, fontFamily: 'inherit',
-    transition: 'color 0.15s, border-color 0.15s',
-  },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden', position: 'relative' },
   messages: { flex: 1, overflowY: 'auto', padding: '24px 0' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
   inputArea: { padding: '12px 24px 20px', borderTop: '1px solid var(--border-light)' },
-  branchBanner: {
-    display: 'flex', alignItems: 'center', gap: 7,
-    margin: '0 32px 12px',
-    padding: '6px 12px',
-    borderRadius: 7,
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border-light)',
-    fontSize: 12,
-    color: 'var(--text-tertiary)',
-  },
   modeSwitcher: {
     display: 'flex',
     border: '1px solid var(--border-medium)',
@@ -775,26 +520,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     paddingRight: 4,
   },
-  previewToggleBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    border: '1px solid var(--border-medium)',
-    background: 'transparent',
-    cursor: 'pointer',
-    color: 'var(--text-tertiary)',
-    transition: 'all 0.15s',
-    padding: 0,
-    flexShrink: 0,
-  },
-  previewToggleBtnActive: {
-    background: 'var(--active-bg)',
-    color: 'var(--text-primary)',
-    borderColor: 'var(--border-dark)',
-  },
   sendBtn: {
     display: 'flex',
     alignItems: 'center',
@@ -827,18 +552,7 @@ const styles: Record<string, React.CSSProperties> = {
 }
 
 const msgStyles: Record<string, React.CSSProperties> = {
-  userRow: { display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 6, padding: '6px 32px' },
-  branchBtn: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 26, height: 26, flexShrink: 0,
-    border: '1px solid var(--border-medium)',
-    borderRadius: 6,
-    background: 'var(--bg-secondary)',
-    cursor: 'pointer',
-    color: 'var(--text-tertiary)',
-    padding: 0,
-    transition: 'color 0.15s, border-color 0.15s',
-  },
+  userRow: { display: 'flex', justifyContent: 'flex-end', padding: '6px 32px' },
   userBubble: { maxWidth: '70%', background: 'var(--bg-secondary)', borderRadius: '14px 14px 4px 14px', padding: '11px 15px' },
   userText: { fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.65 },
   assistantRow: { display: 'flex', gap: 11, padding: '6px 32px', alignItems: 'flex-start' },
@@ -849,46 +563,124 @@ const msgStyles: Record<string, React.CSSProperties> = {
 }
 
 const toolStyles: Record<string, React.CSSProperties> = {
-  block: {
-    width: '100%', marginBottom: 4,
-    borderRadius: 7, border: '1px solid var(--border-light)', borderLeft: '3px solid #999',
-    background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', gap: 6,
-    padding: '7px 10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-    transition: 'background 0.15s',
-  },
-  statusIcon: { flexShrink: 0, display: 'flex', alignItems: 'center' },
-  statusLabel: { fontSize: 11, fontWeight: 500, flexShrink: 0 },
-  toolName: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: 'var(--text-primary)', flexShrink: 0 },
-  summary: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280, minWidth: 0 },
-  duration: { fontSize: 11, color: 'var(--text-tertiary)', flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" },
-  arrow: { fontSize: 16, color: 'var(--text-tertiary)', flexShrink: 0, lineHeight: 1 },
-  filesBtn: {
-    display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 6,
-    padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-light)',
-    borderRadius: 6, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)',
-    fontFamily: 'inherit', transition: 'color 0.15s, border-color 0.15s',
-  },
-}
-
-const detailStyles: Record<string, React.CSSProperties> = {
-  panel: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-light)', overflow: 'hidden' },
-  header: { display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid var(--border-light)', gap: 8, flexShrink: 0 },
-  headerTitle: { fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' },
-  headerDuration: { fontSize: 12, color: 'var(--text-tertiary)', fontFamily: "'IBM Plex Mono', monospace" },
-  headerBadge: { fontSize: 11, fontWeight: 500, padding: '1px 7px', borderRadius: 10 },
-  closeBtn: { background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: '2px 6px', borderRadius: 4, flexShrink: 0, marginLeft: 'auto' },
-  body: { flex: 1, overflowY: 'auto', padding: '16px' },
-  section: { marginBottom: 16 },
-  sectionLabel: { fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace", display: 'block' },
-  code: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, background: 'var(--bg-secondary)', padding: '10px 12px', borderRadius: 6, overflowX: 'auto' as const, overflowY: 'auto' as const, maxHeight: 380, whiteSpace: 'pre-wrap' as const, wordBreak: 'break-all' as const, margin: 0 },
-  terminal: { background: '#1a1a1a', color: '#e8e8e8' },
-  fileItem: { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', marginBottom: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: 8, cursor: 'pointer', textAlign: 'left' as const, fontFamily: 'inherit', transition: 'background 0.15s' },
-  fileIcon: { fontSize: 14, flexShrink: 0, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center' },
-  filePath: { flex: 1, fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, minWidth: 0 },
-  fileTag: { fontSize: 11, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: 4, flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" },
-  fileArrow: { fontSize: 16, color: 'var(--text-tertiary)', flexShrink: 0, lineHeight: 1 },
+  block: { marginBottom: 6, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-light)', background: 'var(--bg-secondary)' },
+  header: { width: '100%', background: 'none', border: 'none', borderLeft: '3px solid var(--text-tertiary)', cursor: 'pointer', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 7 },
+  icon: { fontSize: 12, flexShrink: 0 },
+  name: { fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 500, flexShrink: 0 },
+  body: { padding: '0 10px 10px', borderTop: '1px solid var(--border-light)' },
+  section: { marginTop: 8 },
+  sectionLabel: { fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '0.1em', fontFamily: "'IBM Plex Mono', monospace", display: 'block', marginBottom: 4 },
+  code: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, maxHeight: 180, overflow: 'auto', background: 'var(--bg-tertiary)', padding: '8px 10px', borderRadius: 6 },
 }
 
 const mdStyles: Record<string, React.CSSProperties> = {
   p: { fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.7, margin: '2px 0' },
+}
+
+const floatStyles: Record<string, React.CSSProperties> = {
+  container: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    display: 'flex',
+    gap: 6,
+    zIndex: 10,
+  },
+  btn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    border: '1px solid var(--border-medium)',
+    background: 'var(--bg-primary)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--text-secondary)',
+    transition: 'all 0.15s ease',
+    padding: 0,
+  },
+  btnActive: {
+    background: 'var(--bg-secondary)',
+    borderColor: 'var(--border-strong)',
+    color: 'var(--text-primary)',
+  },
+  panel: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    width: 240,
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-medium)',
+    borderRadius: 10,
+    boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+    overflow: 'hidden',
+  },
+  panelHeader: {
+    padding: '10px 14px 8px',
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--text-tertiary)',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase' as const,
+    borderBottom: '1px solid var(--border-light)',
+  },
+  list: {
+    maxHeight: 240,
+    overflowY: 'auto',
+  },
+  item: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+    padding: '9px 14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'background 0.12s',
+  },
+  itemActive: {
+    background: 'var(--bg-secondary)',
+  },
+  itemTitle: {
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    width: '100%',
+    fontWeight: 500,
+  },
+  itemMeta: {
+    fontSize: 11,
+    color: 'var(--text-tertiary)',
+  },
+  empty: {
+    padding: '14px',
+    fontSize: 13,
+    color: 'var(--text-tertiary)',
+    textAlign: 'center',
+  },
+  panelDivider: {
+    height: 1,
+    background: 'var(--border-light)',
+    margin: '0',
+  },
+  createBtn: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '10px 14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: 'var(--text-secondary)',
+    fontFamily: 'inherit',
+    transition: 'background 0.12s',
+  },
 }

@@ -49,9 +49,8 @@ export interface Conversation {
   title: string
   messages: Message[]
   createdAt: Date
-  tabId?: string      // 关联的标签 ID
-  parentId?: string   // 分支来源对话 ID（仅分支会话有值）
-  branchPoint?: number // 从第几条消息（含）处分叉，0-based
+  tabId?: string  // 关联的标签 ID
+  parentId?: string  // 父会话 ID（分支会话时设置）
 }
 
 export interface Tab {
@@ -61,19 +60,10 @@ export interface Tab {
   isDefault: boolean  // 是否为默认标签
 }
 
-export type AgentEventPayload =
-  | { type: 'start'; workspace: string }
-  | { type: 'step'; step: number; maxSteps: number }
-  | { type: 'text'; text: string }
-  | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; id: string; name: string; input: Record<string, unknown>; result: Record<string, unknown>; duration: number; isError: boolean }
-  | { type: 'done'; text: string; steps: number }
-  | { type: 'error'; message: string }
-  | { type: 'stopped' }
-  | { type: 'thinking'; message: string }
-
-/** 从主进程到达渲染层的事件，附带来源会话 ID */
-export type AgentEvent = AgentEventPayload & { conversationId: string }
+export interface AgentEvent {
+  type: 'start' | 'step' | 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'stopped' | 'thinking'
+  [key: string]: unknown
+}
 
 declare global {
   interface Window {
@@ -81,8 +71,8 @@ declare global {
       getSettings: () => Promise<Settings>
       saveSettings: (s: Partial<Settings>) => Promise<{ ok: boolean }>
       pickFolder: () => Promise<string | null>
-      agentRun: (p: { conversationId: string; messages: Pick<Message, 'role' | 'content'>[]; workspace: string }) => Promise<{ result?: unknown; error?: string }>
-      agentStop: (conversationId: string) => Promise<{ ok: boolean }>
+      agentRun: (p: { messages: Pick<Message, 'role' | 'content'>[]; workspace: string }) => Promise<{ result?: unknown; error?: string }>
+      agentStop: () => Promise<{ ok: boolean }>
       onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void
       fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>
       openInExplorer: (p: string) => void
