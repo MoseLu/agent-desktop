@@ -262,10 +262,9 @@ function AppContent() {
 
     const id = Date.now().toString()
     const tabId = `tab-${Date.now() + 1}`
-    const branchTitle = `${source.title.slice(0, 20)} · 分支`
     const conv: Conversation = {
       id,
-      title: branchTitle,
+      title: '新会话',
       messages: source.messages.slice(0, atIndex + 1),
       createdAt: new Date(),
       tabId,
@@ -274,7 +273,7 @@ function AppContent() {
     }
 
     setConversations(prev => [conv, ...prev])
-    setTabs(prev => [...prev, { id: tabId, title: branchTitle, conversationId: id, isDefault: false }])
+    setTabs(prev => [...prev, { id: tabId, title: '新会话', conversationId: id, isDefault: false }])
     setActiveTabId(tabId)
     setActiveId(id)
     setPage('chat')

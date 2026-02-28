@@ -160,6 +160,20 @@ export default function ChatPage({ conversation, settings, onUpdate, onBranch }:
 
   const chatColumn = (
     <div style={styles.chatColumn}>
+      {/* 顶部栏：右侧放分支按钮 */}
+      <div style={styles.chatHeader}>
+        <Tooltip title="基于当前会话创建分支" position="bottom">
+          <button
+            style={styles.branchHeaderBtn}
+            onClick={() => onBranch(messages.length - 1)}
+            disabled={messages.length === 0}
+          >
+            <BranchIcon />
+            <span>分支会话</span>
+          </button>
+        </Tooltip>
+      </div>
+
       <div style={styles.messages}>
         {/* 分支来源提示 */}
         {conversation.parentId && (
@@ -659,6 +673,19 @@ function RunningDot() {
 const styles: Record<string, React.CSSProperties> = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden' },
   chatColumn: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)' },
+  chatHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+    padding: '0 20px', height: 44, flexShrink: 0,
+    borderBottom: '1px solid var(--border-light)',
+  },
+  branchHeaderBtn: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '0 12px', height: 32,
+    border: '1px solid var(--border-medium)', borderRadius: 8,
+    background: 'transparent', cursor: 'pointer',
+    color: 'var(--text-secondary)', fontSize: 13, fontFamily: 'inherit',
+    transition: 'color 0.15s, border-color 0.15s',
+  },
   messages: { flex: 1, overflowY: 'auto', padding: '24px 0' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
