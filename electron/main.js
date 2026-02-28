@@ -182,3 +182,40 @@ ipcMain.handle('fs-list', async (_, dirPath) => {
 ipcMain.handle('open-in-explorer', (_, p) => shell.showItemInFolder(p))
 
 ipcMain.handle('open-external', (_, url) => shell.openExternal(url))
+
+// ─── Chat Message Proxy (bypasses renderer CORS) ──────────────────────────────
+ipcMain.handle('chat-message', async (_, { provider, apiKey, model, messages }) => {
+  try {
+    let url, headers, body
+
+    if (provider === 'minimax') {
+      url = 'https://api.minimaxi.com/anthropic/v1/messages'
+      headers = {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+      }
+      body = JSON.stringify({
+        model,
+        max_tokens: 8096,
+        messages: messages
+          .filter(m => m.role !== 'system')
+          .map(m => ({ role: m.role, content: m.content })),
+      })
+    } else if (provider === 'qwen') {
+      url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+      headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      }
+      body = JSON.stringify({ model, messages })
+    } else {
+      return { ok: false, error: `Unsupported provider: ${provider}` }
+    }
+
+    const res = await fetch(url, { method: 'POST', headers, body })
+    const data = await res.json()
+    return { ok: res.ok, status: res.status, data }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})

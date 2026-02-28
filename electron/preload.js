@@ -17,4 +17,6 @@ contextBridge.exposeInMainWorld('electron', {
   // Auto launch
   setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
+  // Chat API proxy (routes through Node.js to avoid renderer CORS)
+  chatMessage: (p) => ipcRenderer.invoke('chat-message', p),
 })

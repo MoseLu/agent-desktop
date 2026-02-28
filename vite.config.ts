@@ -31,7 +31,24 @@ export default defineConfig({
   root: 'src',
   base: './',
   build: { outDir: '../dist', emptyOutDir: true },
-  server: { port: 5173, strictPort: true },
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      // MiniMax Anthropic 兼容接口代理（浏览器/Electron dev 模式绕过 CORS）
+      '/api-proxy/minimax': {
+        target: 'https://api.minimaxi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-proxy\/minimax/, ''),
+      },
+      // Qwen DashScope 代理
+      '/api-proxy/qwen': {
+        target: 'https://dashscope.aliyuncs.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-proxy\/qwen/, ''),
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
