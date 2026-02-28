@@ -1,18 +1,48 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import type { Settings, Conversation, Tab, AppMode, ModelOption, ScheduledTask } from '@types'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import type { Settings, Conversation, Tab, AppMode, ModelOption, ScheduledTask, StoredConversation } from '@types'
 import { ThemeProvider, useTheme } from '@contexts/ThemeProvider'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
 import HomePage from '@pages/HomePage'
 import ChatPage from '@pages/ChatPage'
 import ScheduledTasksPage from '@pages/ScheduledTasksPage'
+import LoginPage from '@pages/LoginPage'
 import SettingsModal from '@modals/SettingsModal'
 import SearchModal from '@modals/SearchModal'
 import { TabBar } from '@components/TabBar'
 import { appConfig } from '@config'
 import { isElectron, isRealElectron, callElectron } from '@utils/env'
 
+// ─── Conversation serialization helpers ───────────────────────────────────────
+
+function serializeConv(conv: Conversation): StoredConversation {
+  return {
+    id: conv.id,
+    title: conv.title,
+    mode: conv.mode ?? 'code',
+    smartMode: conv.smartMode ?? false,
+    parentId: conv.parentId,
+    createdAt: conv.createdAt instanceof Date ? conv.createdAt.toISOString() : String(conv.createdAt),
+    messages: conv.messages
+      .filter(m => !m.streaming)
+      .map(m => ({ role: m.role, content: m.content, error: m.error, events: m.events })),
+  }
+}
+
+function deserializeConv(record: StoredConversation): Conversation {
+  return {
+    id: record.id,
+    title: record.title,
+    mode: record.mode,
+    smartMode: record.smartMode,
+    parentId: record.parentId,
+    createdAt: new Date(record.createdAt),
+    messages: record.messages,
+  }
+}
+
 function AppContent() {
+  const [currentUser, setCurrentUser] = useState<string | null | undefined>(undefined) // undefined = loading
   const [settings, setSettings] = useState<Settings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -28,6 +58,11 @@ function AppContent() {
 
   // 应用模式：chat（浏览器/桌面均支持）/ code（仅 Electron）
   const [mode, setMode] = useState<AppMode>('chat')
+
+  // Ref 用于延迟保存（避免 closure stale 问题）
+  const conversationsRef = useRef<Conversation[]>([])
+  useEffect(() => { conversationsRef.current = conversations }, [conversations])
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   // 可用模型列表（由后端根据已配置 provider 动态返回，空数组时 ModelSelector 使用自身默认值）
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([])
@@ -53,15 +88,40 @@ function AppContent() {
     }
   }, [])
 
+  // 从后端加载该用户的历史会话
+  const loadConversations = useCallback(async () => {
+    if (!isElectron()) return
+    try {
+      const records = await window.electron.convList()
+      setConversations(records.map(deserializeConv))
+    } catch (err) {
+      console.error('加载会话历史失败:', err)
+    }
+  }, [])
+
+  // 延迟保存单条会话（防抖 800ms，避免流式更新时频繁写盘）
+  const scheduleConvSave = useCallback((id: string) => {
+    if (!isElectron()) return
+    const existing = saveTimers.current.get(id)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      const conv = conversationsRef.current.find(c => c.id === id)
+      if (conv && !conv.messages.some(m => m.streaming)) {
+        window.electron.convSave(serializeConv(conv)).catch(console.error)
+      }
+      saveTimers.current.delete(id)
+    }, 800)
+    saveTimers.current.set(id, timer)
+  }, [])
+
   useEffect(() => {
     // 使用环境变量检测并获取设置
     if (!isElectron()) {
       console.warn('未在 Electron 环境中运行，使用本地存储数据')
-      // 在浏览器开发模式下从 localStorage 读取设置
       try {
         const stored = localStorage.getItem('app-settings')
         const savedSettings = stored ? JSON.parse(stored) : null
-        
+
         const defaultSettings: Settings = {
           apiKey: '',
           workspace: '',
@@ -80,17 +140,15 @@ function AppContent() {
           autoStart: false,
           shortcut: 'Alt+A',
         }
-        
-        // 合并保存的设置和默认设置
-        const settings = savedSettings 
+
+        const settings = savedSettings
           ? { ...defaultSettings, ...savedSettings }
           : defaultSettings
-        
+
         setSettings(settings)
         setTheme(settings.theme || 'system')
       } catch (err) {
         console.error('Failed to load settings from localStorage:', err)
-        // 使用默认设置
         const defaultSettings: Settings = {
           apiKey: '',
           workspace: '',
@@ -112,23 +170,34 @@ function AppContent() {
         setSettings(defaultSettings)
         setTheme('system')
       }
+      // 浏览器模式：检查 mock auth
+      window.electron.authCheck().then(({ userName }) => {
+        setCurrentUser(userName ?? '开发者')
+      }).catch(() => setCurrentUser('开发者'))
+      // 浏览器模式：加载 mock 历史
+      window.electron.convList().then(records => {
+        setConversations(records.map(deserializeConv))
+      }).catch(() => {})
       return
     }
 
-    // 在 Electron 环境中获取设置
-    callElectron(() => window.electron.getSettings(), undefined)
-      .then(s => {
-        if (s) {
-          setSettings(s)
-          // 初始化主题
-          setTheme(s.theme || 'system')
-        }
-        // 加载设置后拉取可用模型列表
-        fetchAvailableModels()
-      })
-      .catch(err => {
-        console.error('获取设置失败:', err)
-      })
+    // Electron 模式：先检查 auth
+    window.electron.authCheck().then(async ({ userName }) => {
+      setCurrentUser(userName)
+      if (!userName) return  // 未登录，显示 LoginPage
+
+      // 登录后加载设置
+      const s = await callElectron(() => window.electron.getSettings(), undefined)
+      if (s) {
+        setSettings(s)
+        setTheme(s.theme || 'system')
+      }
+      fetchAvailableModels()
+      await loadConversations()
+    }).catch(err => {
+      console.error('Auth check failed:', err)
+      setCurrentUser(null)
+    })
 
     // 监听工作目录变化事件
     const handleWorkspaceChanged = (event: CustomEvent<string>) => {
@@ -250,9 +319,36 @@ function AppContent() {
     }
   }, [tabs, createNewTab])
 
+  // 登录
+  const handleLogin = useCallback(async (userName: string) => {
+    if (isElectron()) {
+      await window.electron.authLogin(userName)
+    }
+    setCurrentUser(userName)
+    // 加载设置和会话
+    if (isElectron()) {
+      const s = await callElectron(() => window.electron.getSettings(), undefined)
+      if (s) { setSettings(s); setTheme(s.theme || 'system') }
+      fetchAvailableModels()
+      await loadConversations()
+    }
+  }, [loadConversations, fetchAvailableModels, setTheme])
+
+  // 退出登录
+  const handleLogout = useCallback(async () => {
+    if (isElectron()) {
+      await window.electron.authLogout()
+    }
+    setCurrentUser(null)
+    setConversations([])
+    setActiveId(null)
+    setPage('home')
+    setTabs([{ id: 'default', title: appConfig.appName, isDefault: true }])
+    setActiveTabId('default')
+  }, [])
+
   // 只有当用户输入了内容时才创建新任务
   const startNewTask = useCallback((initialPrompt?: string, smartMode?: boolean) => {
-    // 如果没有初始提示，不创建任务（从 HomePage 的输入框提交时会传递内容）
     if (!initialPrompt || !initialPrompt.trim()) {
       return null
     }
@@ -264,49 +360,39 @@ function AppContent() {
       messages: [{ role: 'user', content: initialPrompt }],
       createdAt: new Date(),
       smartMode: smartMode ?? false,
+      mode,
     }
     setConversations(prev => [conv, ...prev])
     setActiveId(id)
     setPage('chat')
-    
+
+    // 立即保存到后端
+    if (isElectron()) {
+      window.electron.convSave(serializeConv(conv)).catch(console.error)
+    }
+
     // 检查当前 tab 是否是空的（没有关联对话）
     const currentTab = tabs.find(t => t.id === activeTabId)
     if (currentTab && !currentTab.conversationId) {
-      // 当前 tab 是空的，直接更新它
-      const updatedTab: Tab = {
-        ...currentTab,
-        title: conv.title,
-        conversationId: id,
-      }
+      const updatedTab: Tab = { ...currentTab, title: conv.title, conversationId: id }
       setTabs(prev => prev.map(t => t.id === activeTabId ? updatedTab : t))
       setActiveTabId(activeTabId)
-      // 更新对话的 tabId
-      setConversations(prev => prev.map(c => 
-        c.id === id ? { ...c, tabId: activeTabId } : c
-      ))
+      setConversations(prev => prev.map(c => c.id === id ? { ...c, tabId: activeTabId } : c))
     } else {
-      // 当前 tab 有关联对话或没有激活的 tab，创建新标签
       const tabId = `tab-${Date.now()}`
-      const newTab: Tab = {
-        id: tabId,
-        title: conv.title,
-        conversationId: id,
-        isDefault: false,
-      }
+      const newTab: Tab = { id: tabId, title: conv.title, conversationId: id, isDefault: false }
       setTabs(prev => [...prev, newTab])
       setActiveTabId(tabId)
-      // 更新对话的 tabId
-      setConversations(prev => prev.map(c => 
-        c.id === id ? { ...c, tabId } : c
-      ))
+      setConversations(prev => prev.map(c => c.id === id ? { ...c, tabId } : c))
     }
-    
+
     return { id, initialPrompt }
-  }, [tabs, activeTabId])
+  }, [tabs, activeTabId, mode])
 
   const updateConv = useCallback((id: string, updater: (c: Conversation) => Partial<Conversation>) => {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...updater(c) } : c))
-  }, [])
+    scheduleConvSave(id)
+  }, [scheduleConvSave])
 
   // 获取同一分支树的所有会话（找到根节点后递归收集所有子节点）
   const getBranchFamily = useCallback((convId: string): Conversation[] => {
@@ -357,12 +443,16 @@ function AppContent() {
       setActiveId(null)
       setPage('home')
     }
+    if (isElectron()) {
+      window.electron.convDelete(id).catch(console.error)
+    }
   }
 
   const renameConv = useCallback((id: string, newTitle: string) => {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c))
     setTabs(prev => prev.map(t => t.conversationId === id ? { ...t, title: newTitle } : t))
-  }, [])
+    scheduleConvSave(id)
+  }, [scheduleConvSave])
 
   const addScheduledTask = useCallback((data: Omit<ScheduledTask, 'id' | 'createdAt'>) => {
     const task: ScheduledTask = {
@@ -375,6 +465,21 @@ function AppContent() {
 
   const goHome = () => { setActiveId(null); setPage('home') }
 
+  // 启动中（auth 状态未知）
+  if (currentUser === undefined) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-tertiary)', fontSize: 14 }}>
+        加载中...
+      </div>
+    )
+  }
+
+  // 未登录 → 显示登录页
+  if (currentUser === null) {
+    return <LoginPage onLogin={handleLogin} />
+  }
+
+  // settings 尚未加载（已登录但 settings 还在请求中）
   if (!settings) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-tertiary)', fontSize: 14 }}>
@@ -407,6 +512,7 @@ function AppContent() {
           onNewTask={handleSidebarNewTask}
           onDelete={deleteConv}
           onRename={renameConv}
+          onLogout={handleLogout}
           onSettings={() => setShowSettings(true)}
           onSearch={() => setShowSearch(true)}
           onScheduledTasks={() => { setPage('scheduled-tasks'); setActiveId(null) }}

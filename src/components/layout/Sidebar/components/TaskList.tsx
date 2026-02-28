@@ -182,6 +182,54 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
   )
 }
 
+// ─── Section component ────────────────────────────────────────────────────────
+
+interface SectionProps {
+  label: string
+  conversations: TaskListProps['conversations']
+  activeRootId: string | null
+  hoverId: string | null
+  onHoverChange: (id: string | null) => void
+  onSelect: (id: string) => void
+  onDelete: (id: string) => void
+  onRename: (id: string, newTitle: string) => void
+  onCopyId: (id: string) => void
+}
+
+function Section({ label, conversations, activeRootId, hoverId, onHoverChange, onSelect, onDelete, onRename, onCopyId }: SectionProps) {
+  const [open, setOpen] = useState(true)
+
+  if (conversations.length === 0) return null
+
+  return (
+    <>
+      <button style={styles.collapsibleHeader} onClick={() => setOpen(p => !p)}>
+        <span style={{ fontSize: 11, letterSpacing: 0.3, opacity: 0.6 }}>{label}</span>
+        <ChevronIcon style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', opacity: 0.6 }} />
+      </button>
+      {open && (
+        <div style={styles.taskList}>
+          {conversations.map(conv => (
+            <TaskItem
+              key={conv.id}
+              conversation={conv}
+              isActive={conv.id === activeRootId}
+              isHovered={hoverId === conv.id}
+              onSelect={() => onSelect(conv.id)}
+              onDelete={() => onDelete(conv.id)}
+              onHoverChange={hovered => onHoverChange(hovered ? conv.id : null)}
+              onCopyId={onCopyId}
+              onRename={onRename}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── TaskList ─────────────────────────────────────────────────────────────────
+
 export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, onRename, onToggle }: TaskListProps) {
   const [hoverId, setHoverId] = React.useState<string | null>(null)
   // 只显示根会话，子会话（分支）在 ChatPage 内的 tab 栏中展示
@@ -196,6 +244,10 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
     }
     return current?.id ?? activeId
   }, [activeId, conversations])
+
+  // 按 mode 分组
+  const chatConvs = useMemo(() => rootConversations.filter(c => c.mode === 'chat'), [rootConversations])
+  const codeConvs = useMemo(() => rootConversations.filter(c => c.mode !== 'chat'), [rootConversations])
 
   const handleCopyId = async (id: string) => {
     try {
@@ -212,6 +264,16 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
     message.success('重命名成功')
   }
 
+  const sectionProps = {
+    activeRootId,
+    hoverId,
+    onHoverChange: setHoverId,
+    onSelect,
+    onDelete,
+    onRename: handleRename,
+    onCopyId: handleCopyId,
+  }
+
   return (
     <>
       <button style={styles.collapsibleHeader} onClick={onToggle}>
@@ -220,25 +282,16 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
       </button>
 
       {isOpen && (
-        <div style={styles.taskList}>
+        <>
           {rootConversations.length === 0 ? (
             <p style={styles.emptyText}>没有任务记录</p>
           ) : (
-            rootConversations.map(conversation => (
-              <TaskItem
-                key={conversation.id}
-                conversation={conversation}
-                isActive={conversation.id === activeRootId}
-                isHovered={hoverId === conversation.id}
-                onSelect={() => onSelect(conversation.id)}
-                onDelete={() => onDelete(conversation.id)}
-                onHoverChange={hovered => setHoverId(hovered ? conversation.id : null)}
-                onCopyId={handleCopyId}
-                onRename={handleRename}
-              />
-            ))
+            <>
+              <Section label="对话" conversations={chatConvs} {...sectionProps} />
+              <Section label="代码 / Agent" conversations={codeConvs} {...sectionProps} />
+            </>
           )}
-        </div>
+        </>
       )}
     </>
   )

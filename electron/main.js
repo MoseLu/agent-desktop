@@ -11,6 +11,7 @@ let store
 let agentHub
 let proxyServer   // 本地代理 HTTP 服务器
 let proxyConfig   // 代理配置管理器
+const conversationStores = new Map() // cache: storeName → Store instance
 const isDev = !app.isPackaged
 
 // 配置 CCSwith 代理（如果启用）
@@ -161,6 +162,61 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+function getConvStore(userName) {
+  const safeKey = userName.replace(/[^a-z0-9_-]/gi, '_').slice(0, 32).toLowerCase()
+  const storeName = `conv_${safeKey || 'default'}`
+  if (!conversationStores.has(storeName)) {
+    conversationStores.set(storeName, new Store({ name: storeName }))
+  }
+  return conversationStores.get(storeName)
+}
+
+ipcMain.handle('auth:check', () => {
+  const userName = store.get('auth.currentUser', '') || null
+  return { userName }
+})
+
+ipcMain.handle('auth:login', (_, userName) => {
+  store.set('auth.currentUser', userName)
+  return { ok: true }
+})
+
+ipcMain.handle('auth:logout', () => {
+  store.delete('auth.currentUser')
+  return { ok: true }
+})
+
+// ─── Conversations Persistence ─────────────────────────────────────────────────
+
+ipcMain.handle('conv:list', () => {
+  const userName = store.get('auth.currentUser', '') || null
+  if (!userName) return []
+  return getConvStore(userName).get('conversations', [])
+})
+
+ipcMain.handle('conv:save', (_, conv) => {
+  const userName = store.get('auth.currentUser', '') || null
+  if (!userName) return { ok: false, error: 'not authenticated' }
+  const convStore = getConvStore(userName)
+  const convs = convStore.get('conversations', [])
+  const idx = convs.findIndex(c => c.id === conv.id)
+  if (idx >= 0) convs[idx] = conv
+  else convs.unshift(conv)
+  convStore.set('conversations', convs)
+  return { ok: true }
+})
+
+ipcMain.handle('conv:delete', (_, id) => {
+  const userName = store.get('auth.currentUser', '') || null
+  if (!userName) return { ok: false, error: 'not authenticated' }
+  const convStore = getConvStore(userName)
+  const convs = convStore.get('conversations', []).filter(c => c.id !== id)
+  convStore.set('conversations', convs)
+  return { ok: true }
+})
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 ipcMain.handle('get-settings', () => ({

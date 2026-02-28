@@ -29,4 +29,12 @@ contextBridge.exposeInMainWorld('electron', {
   checkAvailableAgents: () => ipcRenderer.invoke('agent:check-available'),
   testAgent: (params) => ipcRenderer.invoke('agent:test', params),
   selectBestAgent: () => ipcRenderer.invoke('agent:select-best'),
+  // Auth
+  authCheck: () => ipcRenderer.invoke('auth:check'),
+  authLogin: (userName) => ipcRenderer.invoke('auth:login', userName),
+  authLogout: () => ipcRenderer.invoke('auth:logout'),
+  // Conversations persistence
+  convList: () => ipcRenderer.invoke('conv:list'),
+  convSave: (conv) => ipcRenderer.invoke('conv:save', conv),
+  convDelete: (id) => ipcRenderer.invoke('conv:delete', id),
 })

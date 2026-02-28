@@ -12,7 +12,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 
-export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpenChange, collapsed = false }: UserMenuProps) {
+export function UserMenu({ settings, onSettings, onScheduledTasks, onLogout, isOpen, onOpenChange, collapsed = false }: UserMenuProps) {
   const displayName = settings.userName || '开发者'
   const displayPlan = settings.userPlan || '免费'
   
@@ -72,7 +72,7 @@ export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpe
             
             <div style={styles.menuDivider} />
             
-            <div style={styles.menuItem} onClick={() => onOpenChange(false)}>
+            <div style={styles.menuItem} onClick={() => { onOpenChange(false); onLogout() }}>
               <LogoutOutlined style={{ fontSize: 16 }} />
               <span style={{ color: 'var(--error)' }}>退出登录</span>
             </div>
@@ -139,7 +139,7 @@ export function UserMenu({ settings, onSettings, onScheduledTasks, isOpen, onOpe
           
           <div style={styles.menuDivider} />
           
-          <div style={styles.menuItem} onClick={() => onOpenChange(false)}>
+          <div style={styles.menuItem} onClick={() => { onOpenChange(false); onLogout() }}>
             <LogoutOutlined />
             <span style={{ color: 'var(--error)' }}>退出登录</span>
           </div>

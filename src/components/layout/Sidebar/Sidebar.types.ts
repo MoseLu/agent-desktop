@@ -9,6 +9,7 @@ export interface SidebarProps {
   onNewTask: () => void
   onDelete: (id: string) => void
   onRename: (id: string, newTitle: string) => void
+  onLogout: () => void
   onSettings: () => void
   onSearch: () => void
   onScheduledTasks: () => void
@@ -26,6 +27,7 @@ export interface UserMenuProps {
   settings: Settings
   onSettings: () => void
   onScheduledTasks: () => void
+  onLogout: () => void
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   collapsed?: boolean

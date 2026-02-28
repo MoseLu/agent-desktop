@@ -46,6 +46,16 @@ interface AgentEvent {
   [key: string]: unknown;
 }
 
+interface StoredConversation {
+  id: string;
+  title: string;
+  mode: 'chat' | 'code';
+  smartMode: boolean;
+  parentId?: string;
+  createdAt: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string; error?: boolean }>;
+}
+
 interface ElectronAPI {
   getSettings: () => Promise<Settings>;
   saveSettings: (s: Partial<Settings>) => Promise<{ ok: boolean }>;
@@ -56,6 +66,12 @@ interface ElectronAPI {
   fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>;
   openInExplorer: (p: string) => void;
   openExternal: (url: string) => Promise<void>;
+  authCheck: () => Promise<{ userName: string | null }>;
+  authLogin: (userName: string) => Promise<{ ok: boolean }>;
+  authLogout: () => Promise<{ ok: boolean }>;
+  convList: () => Promise<StoredConversation[]>;
+  convSave: (conv: StoredConversation) => Promise<{ ok: boolean }>;
+  convDelete: (id: string) => Promise<{ ok: boolean }>;
 }
 
 // ─── 全局事件总线（替代随机 interval） ────────────────────────────────────────
@@ -157,6 +173,53 @@ const createMockElectron = (): ElectronAPI => {
 
     openExternal: async (url: string) => {
       window.open(url, '_blank')
+    },
+
+    authCheck: async () => {
+      const userName = localStorage.getItem('mock-auth-user') || '开发者'
+      return { userName }
+    },
+
+    authLogin: async (userName: string) => {
+      localStorage.setItem('mock-auth-user', userName)
+      return { ok: true }
+    },
+
+    authLogout: async () => {
+      localStorage.removeItem('mock-auth-user')
+      return { ok: true }
+    },
+
+    convList: async () => {
+      const userName = localStorage.getItem('mock-auth-user') || 'default'
+      try {
+        const key = `mock-conv-${userName}`
+        const stored = localStorage.getItem(key)
+        return stored ? JSON.parse(stored) : []
+      } catch { return [] }
+    },
+
+    convSave: async (conv: StoredConversation) => {
+      const userName = localStorage.getItem('mock-auth-user') || 'default'
+      try {
+        const key = `mock-conv-${userName}`
+        const convs: StoredConversation[] = JSON.parse(localStorage.getItem(key) || '[]')
+        const idx = convs.findIndex(c => c.id === conv.id)
+        if (idx >= 0) convs[idx] = conv
+        else convs.unshift(conv)
+        localStorage.setItem(key, JSON.stringify(convs))
+      } catch (e) { console.warn('[Mock] convSave failed', e) }
+      return { ok: true }
+    },
+
+    convDelete: async (id: string) => {
+      const userName = localStorage.getItem('mock-auth-user') || 'default'
+      try {
+        const key = `mock-conv-${userName}`
+        const convs: StoredConversation[] = JSON.parse(localStorage.getItem(key) || '[]')
+        localStorage.setItem(key, JSON.stringify(convs.filter(c => c.id !== id)))
+      } catch (e) { console.warn('[Mock] convDelete failed', e) }
+      return { ok: true }
     },
   }
 }

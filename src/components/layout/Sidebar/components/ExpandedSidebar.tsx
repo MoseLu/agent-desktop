@@ -61,6 +61,7 @@ export function ExpandedSidebar({
           settings={props.settings}
           onSettings={props.onSettings}
           onScheduledTasks={props.onScheduledTasks}
+          onLogout={props.onLogout}
           isOpen={userMenuOpen}
           onOpenChange={onToggleUserMenu}
         />

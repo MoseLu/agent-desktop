@@ -75,6 +75,23 @@ export interface Conversation {
   tabId?: string  // 关联的标签 ID
   parentId?: string  // 父会话 ID（分支会话时设置）
   smartMode?: boolean  // 全能模式(true) / 高效模式(false)，在首页选择后锁定
+  mode?: AppMode  // 'chat' | 'code'，创建时锁定
+}
+
+/** 用于持久化到 electron-store 的会话记录（不含瞬态字段） */
+export interface StoredConversation {
+  id: string
+  title: string
+  mode: AppMode
+  smartMode: boolean
+  parentId?: string
+  createdAt: string  // ISO 字符串
+  messages: Array<{
+    role: 'user' | 'assistant'
+    content: string
+    error?: boolean
+    events?: ToolEvent[]
+  }>
 }
 
 export interface ScheduledTask {
@@ -128,6 +145,14 @@ declare global {
       checkAvailableAgents: () => Promise<string[]>
       testAgent: (params: { model: string }) => Promise<{ success: boolean; content?: string; error?: string }>
       selectBestAgent: () => Promise<{ success: boolean; agent?: string; error?: string }>
+      // Auth
+      authCheck: () => Promise<{ userName: string | null }>
+      authLogin: (userName: string) => Promise<{ ok: boolean }>
+      authLogout: () => Promise<{ ok: boolean }>
+      // Conversations persistence
+      convList: () => Promise<StoredConversation[]>
+      convSave: (conv: StoredConversation) => Promise<{ ok: boolean }>
+      convDelete: (id: string) => Promise<{ ok: boolean }>
     }
   }
 }
