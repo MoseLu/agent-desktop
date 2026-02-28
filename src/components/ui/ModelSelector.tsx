@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { ModelOption } from '@types'
 
 export type { ModelOption }
@@ -22,7 +23,7 @@ const DEFAULT_MODEL_OPTIONS: ModelOption[] = [
   { value: 'qwen-plus', label: 'Qwen Plus', group: 'qwen' },
   { value: 'qwen-max',  label: 'Qwen Max',  group: 'qwen' },
   // GLM
-  { value: 'glm-5',  label: 'GLM-5',  group: 'glm' },
+  { value: 'glm-5',   label: 'GLM-5',   group: 'glm' },
   { value: 'glm-4.7', label: 'GLM-4.7', group: 'glm' },
   // Kimi
   { value: 'kimi-k2.5', label: 'Kimi K2.5', group: 'kimi' },
@@ -49,23 +50,66 @@ const GROUP_COLORS: Record<string, string> = {
   'kimi': '#0ea5e9',
 }
 
+const PANEL_WIDTH = 320
+const PANEL_MAX_HEIGHT = 440
+const GAP = 8
+
 export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL_OPTIONS }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedGroup, setSelectedGroup] = useState<string>('all')
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
-  // 点击外部关闭下拉框
+  // 计算面板的 fixed 位置（在触发按钮上方或下方）
+  const updatePanelPosition = useCallback(() => {
+    const btn = triggerRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    const spaceAbove = rect.top
+    const spaceBelow = window.innerHeight - rect.bottom
+
+    // 优先在上方展开，空间不够时在下方展开
+    const openAbove = spaceAbove >= Math.min(PANEL_MAX_HEIGHT, 200) || spaceAbove >= spaceBelow
+    const maxH = openAbove
+      ? Math.min(PANEL_MAX_HEIGHT, spaceAbove - GAP)
+      : Math.min(PANEL_MAX_HEIGHT, spaceBelow - GAP)
+
+    const right = window.innerWidth - rect.right
+    const clampedRight = Math.max(GAP, Math.min(right, window.innerWidth - PANEL_WIDTH - GAP))
+
+    setPanelStyle({
+      position: 'fixed',
+      right: clampedRight,
+      width: PANEL_WIDTH,
+      maxHeight: maxH,
+      zIndex: 9999,
+      ...(openAbove
+        ? { bottom: window.innerHeight - rect.top + GAP }
+        : { top: rect.bottom + GAP }),
+    })
+  }, [])
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    if (!isOpen) return
+    updatePanelPosition()
+
+    const close = (e: MouseEvent) => {
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        !(e.target as Element).closest?.('[data-model-panel]')
+      ) {
         setIsOpen(false)
       }
     }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('mousedown', close)
+    window.addEventListener('resize', updatePanelPosition)
+    window.addEventListener('scroll', updatePanelPosition, true)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      window.removeEventListener('resize', updatePanelPosition)
+      window.removeEventListener('scroll', updatePanelPosition, true)
     }
-  }, [isOpen])
+  }, [isOpen, updatePanelPosition])
 
   // 当前选中的模型
   const currentModel = options.find(m => m.value === value) || options[0]
@@ -101,10 +145,73 @@ export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL
     setIsOpen(false)
   }
 
+  const panel = isOpen ? createPortal(
+    <div data-model-panel style={{ ...styles.dropdownPanel, ...panelStyle }}>
+      {/* 组别筛选（仅当有多于一组时显示） */}
+      {filterTabs.length > 2 && (
+        <div style={styles.groupFilter}>
+          {filterTabs.map(({ key, label }) => (
+            <button
+              key={key}
+              style={{
+                ...styles.groupFilterBtn,
+                ...(selectedGroup === key ? styles.groupFilterBtnActive : {}),
+              }}
+              onClick={() => setSelectedGroup(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 模型列表 */}
+      <div style={styles.modelList}>
+        {Object.entries(groupedOptions).map(([group, models]) => (
+          <div key={group} style={styles.modelGroup}>
+            <div style={styles.modelGroupHeader}>
+              <span style={styles.modelGroupLabel}>{GROUP_LABELS[group] ?? group}</span>
+              <span style={{ ...styles.modelGroupDot, background: GROUP_COLORS[group] ?? '#888' }} />
+            </div>
+            {models.map(model => (
+              <button
+                key={model.value}
+                style={{
+                  ...styles.modelItem,
+                  ...(model.value === value ? styles.modelItemActive : {}),
+                }}
+                onClick={() => handleModelSelect(model.value)}
+              >
+                <div style={styles.modelItemLeft}>
+                  <span style={styles.modelItemLabel}>{model.label}</span>
+                  {model.description && (
+                    <span style={styles.modelItemDesc}>{model.description}</span>
+                  )}
+                </div>
+                {model.value === value && (
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M13.3332 4L5.99984 11.3333L2.6665 8"
+                      stroke="#0094fc"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>,
+    document.body,
+  ) : null
+
   return (
-    <div ref={containerRef} style={styles.container}>
+    <div style={styles.container}>
       {/* 触发器按钮 */}
-      <button style={styles.triggerBtn} onClick={() => setIsOpen(p => !p)}>
+      <button ref={triggerRef} style={styles.triggerBtn} onClick={() => setIsOpen(p => !p)}>
         <span style={styles.modelLabel}>
           {currentModel?.label || value}
         </span>
@@ -113,68 +220,7 @@ export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL
         </svg>
       </button>
 
-      {/* 下拉面板 */}
-      {isOpen && (
-        <div style={styles.dropdownPanel}>
-          {/* 组别筛选（仅当有多于一组时显示） */}
-          {filterTabs.length > 2 && (
-            <div style={styles.groupFilter}>
-              {filterTabs.map(({ key, label }) => (
-                <button
-                  key={key}
-                  style={{
-                    ...styles.groupFilterBtn,
-                    ...(selectedGroup === key ? styles.groupFilterBtnActive : {}),
-                  }}
-                  onClick={() => setSelectedGroup(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* 模型列表 */}
-          <div style={styles.modelList}>
-            {Object.entries(groupedOptions).map(([group, models]) => (
-              <div key={group} style={styles.modelGroup}>
-                <div style={styles.modelGroupHeader}>
-                  <span style={styles.modelGroupLabel}>{GROUP_LABELS[group] ?? group}</span>
-                  <span style={{ ...styles.modelGroupDot, background: GROUP_COLORS[group] ?? '#888' }} />
-                </div>
-                {models.map(model => (
-                  <button
-                    key={model.value}
-                    style={{
-                      ...styles.modelItem,
-                      ...(model.value === value ? styles.modelItemActive : {}),
-                    }}
-                    onClick={() => handleModelSelect(model.value)}
-                  >
-                    <div style={styles.modelItemLeft}>
-                      <span style={styles.modelItemLabel}>{model.label}</span>
-                      {model.description && (
-                        <span style={styles.modelItemDesc}>{model.description}</span>
-                      )}
-                    </div>
-                    {model.value === value && (
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path
-                          d="M13.3332 4L5.99984 11.3333L2.6665 8"
-                          stroke="#0094fc"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {panel}
     </div>
   )
 }
@@ -200,11 +246,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   dropdownPanel: {
-    position: 'absolute',
-    right: 0,
-    bottom: 'calc(100% + 8px)',
-    width: 320,
-    maxHeight: 440,
     background: 'var(--bg-primary)',
     borderRadius: 12,
     boxShadow: 'var(--shadow-lg)',
@@ -212,7 +253,6 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 1000,
   },
   groupFilter: {
     display: 'flex',
@@ -220,6 +260,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 4,
     padding: 8,
     borderBottom: '1px solid var(--border-light)',
+    flexShrink: 0,
   },
   groupFilterBtn: {
     padding: '5px 8px',
