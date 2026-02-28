@@ -82,6 +82,10 @@ declare global {
       openExternal: (url: string) => Promise<void>
       setAutoLaunch: (enabled: boolean) => Promise<{ ok: boolean }>
       getAutoLaunch: () => Promise<{ openAtLogin: boolean }>
+      // Agent Hub (多 Agent 支持)
+      checkAvailableAgents: () => Promise<string[]>
+      testAgent: (params: { model: string; apiKey: string }) => Promise<{ success: boolean; content?: string; error?: string }>
+      selectBestAgent: () => Promise<{ success: boolean; agent?: string; error?: string }>
     }
   }
 }

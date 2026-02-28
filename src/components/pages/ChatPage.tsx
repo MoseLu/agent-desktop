@@ -9,6 +9,7 @@ import {
   FolderIcon,
   LightningIcon,
   GearIcon,
+  SlidersIcon,
   OmnipotentModeIcon as OmnipotentIcon,
 } from '@ui/icons'
 import { ArrowUpOutlined } from '@ant-design/icons'
@@ -43,9 +44,31 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
   const [statusText, setStatusText] = useState('')
   const [isSmartMode, setIsSmartMode] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [workspace, setWorkspace] = useState(settings.workspace || '未设置工作目录')
+  const [workspaceName, setWorkspaceName] = useState('未设置工作目录')
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const historyPanelRef = useRef<HTMLDivElement>(null)
+  
+  // 更新工作目录显示
+  useEffect(() => {
+    if (settings.workspace) {
+      setWorkspace(settings.workspace)
+      const parts = settings.workspace.split(/[\\/]/)
+      setWorkspaceName(parts[parts.length - 1] || settings.workspace)
+    }
+  }, [settings.workspace])
+  
+  // 选择工作目录
+  const handleSelectWorkspace = async () => {
+    if (!isElectron()) return
+    const newWorkspace = await window.electron.pickFolder()
+    if (newWorkspace) {
+      await window.electron.saveSettings({ workspace: newWorkspace })
+      // 触发工作目录变化事件
+      window.dispatchEvent(new CustomEvent('workspace-changed', { detail: newWorkspace }))
+    }
+  }
 
   const messages = conversation.messages
 
@@ -206,8 +229,6 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
     }
   }
 
-  const workspaceName = settings.workspace || '未设置工作目录'
-
   return (
     <div style={styles.page}>
       {/* 聊天顶部操作栏（独立行，不遮挡消息） */}
@@ -289,24 +310,62 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
               leftContent={
                 // Code 模式才显示文件附件按钮
                 mode === 'code' ? (
-                  <IconButton
-                    variant="bordered"
-                    icon={<AttachIcon />}
-                    title="上传文件"
-                  />
+                  <>
+                    <IconButton 
+                      variant="bordered" 
+                      icon={<AttachIcon />} 
+                      title="上传文件"
+                    />
+                    <IconButton 
+                      variant="bordered" 
+                      icon={<SlidersIcon />} 
+                      title="更多选项"
+                    />
+                    {isRealElectron() && (
+                      <Tooltip title={settings.workspace ? `工作目录：${settings.workspace}` : '点击选择工作目录'} position="bottom">
+                        <div 
+                          style={{
+                            ...styles.workspacePill,
+                            cursor: 'pointer',
+                          }}
+                          onClick={handleSelectWorkspace}
+                        >
+                          <FolderIcon size={13} />
+                          <span style={styles.workspaceText}>{workspaceName}</span>
+                        </div>
+                      </Tooltip>
+                    )}
+                  </>
                 ) : null
               }
               rightContent={(
                 <>
-                  {/* Code 模式才显示工作目录 */}
-                  {mode === 'code' && isRealElectron() && (
-                    <>
-                      <div style={styles.statusItem}>
-                        <FolderIcon size={14} />
-                        <span style={styles.statusText}>{workspaceName}</span>
-                      </div>
-                      <div style={styles.divider} />
-                    </>
+                  {/* Code 模式显示全能/高效模式切换 */}
+                  {mode === 'code' && (
+                    <div style={styles.modeSwitcher}>
+                      <Tooltip title="高效模式" position="bottom">
+                        <button
+                          style={{
+                            ...styles.modeBtn,
+                            ...(!isSmartMode ? styles.modeBtnActive : {}),
+                          }}
+                          onClick={() => setIsSmartMode(false)}
+                        >
+                          <LightningIcon size={15} />
+                        </button>
+                      </Tooltip>
+                      <Tooltip title="全能模式" position="bottom">
+                        <button
+                          style={{
+                            ...styles.modeBtn,
+                            ...(isSmartMode ? styles.modeBtnActive : {}),
+                          }}
+                          onClick={() => setIsSmartMode(true)}
+                        >
+                          <OmnipotentIcon size={15} />
+                        </button>
+                      </Tooltip>
+                    </div>
                   )}
 
                   {/* Chat 模式显示当前模型名 */}

@@ -1,16 +1,69 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Menu } = require('electron')
 const path = require('path')
 const AgentService = require('./agent/service')
+const { AgentHub } = require('./agent/agent-hub')
 
 // electron-store 是 ESM 模块，需要动态导入
 let Store
 let store
+let agentHub
 const isDev = !app.isPackaged
+
+// 配置 CCSwith 代理（如果启用）
+function configureCCSwithProxy() {
+  const useCCSwith = process.env.USE_CCSWITH === 'true' || process.argv.includes('--ccswitch')
+  
+  if (useCCSwith) {
+    const proxyServer = process.env.CCSWITH_PROXY || '127.0.0.1:8888'
+    console.log(`[Main] 🔄 启用 CCSwith 代理：${proxyServer}`)
+    
+    // 配置 Electron 使用代理
+    app.commandLine.appendSwitch('proxy-server', proxyServer)
+    
+    // 配置 bypass 规则（本地地址不走代理）
+    app.commandLine.appendSwitch('proxy-bypass-rules', 'localhost,127.0.0.1,<local>')
+    
+    console.log('[Main] ✅ CCSwith 代理配置成功')
+  }
+}
+
+// 启动时配置代理
+configureCCSwithProxy()
 
 async function initStore() {
   Store = (await import('electron-store')).default
   store = new Store()
   agentService = new AgentService(store)
+  agentHub = new AgentHub()
+  
+  // 初始化时检查可用的 Agent
+  checkAvailableAgents()
+}
+
+// 检查并注册可用的 Agent
+async function checkAvailableAgents() {
+  const apiKeys = {
+    minimax: store.get('apiKey', ''),
+    qwen: store.get('qwenApiKey', ''),
+    claude: store.get('claudeApiKey', ''),
+    openai: store.get('openaiApiKey', ''),
+  }
+  
+  const model = store.get('model', '')
+  
+  // 根据当前选择的模型注册对应的 Agent
+  if (model) {
+    const apiKey = apiKeys.minimax || apiKeys.qwen || apiKeys.claude || apiKeys.openai
+    if (apiKey) {
+      try {
+        const adapter = agentHub.getAdapter(model, apiKey)
+        const available = await adapter.isAvailable()
+        console.log(`[Main] Agent ${model} 可用性：${available ? '✅' : '❌'}`)
+      } catch (error) {
+        console.warn(`[Main] 初始化 Agent ${model} 失败:`, error.message)
+      }
+    }
+  }
 }
 
 // 移除默认菜单栏
@@ -164,6 +217,82 @@ ipcMain.handle('agent-run', (_, { conversationId, messages, workspace }) =>
 ipcMain.handle('agent-stop', (_, conversationId) => {
   agentService.stop(conversationId)
   return { ok: true }
+})
+
+// ─── Agent Hub (新增多 Agent 支持) ────────────────────────────────────────────
+
+// 检查可用的 Agent
+ipcMain.handle('agent:check-available', async () => {
+  const apiKeys = {
+    minimax: store.get('apiKey', ''),
+    qwen: store.get('qwenApiKey', ''),
+    claude: store.get('claudeApiKey', ''),
+    openai: store.get('openaiApiKey', ''),
+  }
+  
+  const available = []
+  for (const [name, apiKey] of Object.entries(apiKeys)) {
+    if (!apiKey) continue
+    
+    try {
+      const modelName = name === 'minimax' ? 'MiniMax-M2.5' 
+        : name === 'qwen' ? 'qwen3-coder-next'
+        : name === 'claude' ? 'claude-sonnet-4-20250514'
+        : 'gpt-4-turbo'
+      
+      if (await agentHub.checkAvailability(modelName, apiKey)) {
+        available.push(name)
+      }
+    } catch (error) {
+      console.warn(`[Main] 检查 ${name} 失败:`, error.message)
+    }
+  }
+  
+  return available
+})
+
+// 测试指定 Agent
+ipcMain.handle('agent:test', async (_, { model, apiKey }) => {
+  try {
+    const adapter = agentHub.getAdapter(model, apiKey)
+    const response = await adapter.chat({
+      messages: [{ role: 'user', content: '你好，请用一句话介绍自己' }],
+      maxTokens: 100,
+    })
+    return { 
+      success: true, 
+      content: response.content,
+      usage: response.usage,
+    }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+// 智能选择最佳 Agent
+ipcMain.handle('agent:select-best', async () => {
+  const apiKeys = {
+    minimax: store.get('apiKey', ''),
+    qwen: store.get('qwenApiKey', ''),
+    claude: store.get('claudeApiKey', ''),
+    openai: store.get('openaiApiKey', ''),
+  }
+  
+  // 过滤掉空的 API Key
+  const validKeys = {}
+  for (const [key, value] of Object.entries(apiKeys)) {
+    if (value) validKeys[key] = value
+  }
+  
+  try {
+    const bestAgent = await agentHub.selectBestAgent(
+      { messages: [{ role: 'user', content: 'test' }] },
+      validKeys
+    )
+    return { success: true, agent: bestAgent }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
 })
 
 // ─── Filesystem ───────────────────────────────────────────────────────────────
