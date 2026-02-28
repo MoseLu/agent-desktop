@@ -472,10 +472,10 @@ function MiniChevron({ open }: { open: boolean }) {
 
 const styles: Record<string, React.CSSProperties> = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden', position: 'relative' },
-  messages: { flex: 1, overflowY: 'auto', padding: '24px 0' },
+  messages: { flex: 1, overflowY: 'auto', padding: '24px 0 8px' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
-  inputArea: { padding: '12px 24px 20px', borderTop: '1px solid var(--border-light)' },
+  inputArea: { padding: '8px 20px 16px' },
   modeSwitcher: {
     display: 'flex',
     border: '1px solid var(--border-medium)',
