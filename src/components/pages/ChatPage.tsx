@@ -50,6 +50,54 @@ export default function ChatPage({ conversation, settings, mode, availableModels
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
 
+  // ─── AI 标题生成 ───────────────────────────────────────────────────────────
+  const titleGenerated = useRef(false)
+  const hasSentMessage = useRef(false)
+
+  // 切换会话时重置标志
+  useEffect(() => {
+    titleGenerated.current = false
+    hasSentMessage.current = false
+  }, [conversation.id])
+
+  const generateTitle = useCallback(async (userMessage: string, assistantResponse: string) => {
+    if (titleGenerated.current) return
+    titleGenerated.current = true
+    try {
+      const title = await sendChatMessage(
+        '',
+        settings.model,
+        [
+          {
+            role: 'system',
+            content: '你是一个会话标题生成助手。根据以下对话内容，生成8个字以内的简洁中文标题。只输出标题本身，不要引号，不要标点符号，不要任何解释。',
+          },
+          {
+            role: 'user',
+            content: `用户：${userMessage.slice(0, 200)}\n助手：${assistantResponse.slice(0, 200)}`,
+          },
+        ]
+      )
+      const cleanTitle = title.trim().replace(/^["'「」【】《》""'']+|["'「」【】《》""'']+$/g, '').slice(0, 20)
+      if (cleanTitle) {
+        onUpdate(() => ({ title: cleanTitle }))
+      }
+    } catch (err) {
+      console.warn('[TitleGen] 标题生成失败，保留默认标题', err)
+    }
+  }, [settings.model, onUpdate])
+
+  // 监听会话消息，在第一轮对话完成后自动生成标题
+  useEffect(() => {
+    if (!hasSentMessage.current) return
+    if (titleGenerated.current) return
+    const msgs = conversation.messages
+    const firstUser = msgs.find(m => m.role === 'user')
+    const firstAssistant = msgs.find(m => m.role === 'assistant')
+    if (!firstUser || !firstAssistant || firstAssistant.streaming) return
+    generateTitle(firstUser.content, firstAssistant.content)
+  }, [conversation.messages, generateTitle])
+
   // 更新工作目录显示
   useEffect(() => {
     if (settings.workspace) {
@@ -151,6 +199,7 @@ export default function ChatPage({ conversation, settings, mode, availableModels
 
   const sendMessage = async (content = input.trim()) => {
     if (!content || isRunning) return
+    hasSentMessage.current = true
     setInput('')
     setIsRunning(true)
     setStatusText('思考中...')
