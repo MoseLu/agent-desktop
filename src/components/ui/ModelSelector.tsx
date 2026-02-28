@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import Tooltip from './Tooltip'
 
 export interface ModelOption {
-
-export interface ModelOption {
   value: string
   label: string
   group: 'minimax' | 'qwen' | 'qwen-coding' | 'claude'
@@ -90,13 +88,13 @@ export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL
   return (
     <div ref={containerRef} style={styles.container}>
       {/* 触发器按钮 */}
+      <button style={styles.triggerBtn} onClick={() => setIsOpen(p => !p)}>
         <span style={styles.modelLabel}>
           {currentModel?.label || value}
         </span>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
           <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-      </button>
       </button>
 
       {/* 下拉面板 */}

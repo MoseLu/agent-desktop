@@ -344,8 +344,6 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
                   />
 
                   <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
-
-                  <Tooltip title={input.trim() ? '发送（Enter）' : '请输入内容'} position="top">
                     <button
                       onClick={() => sendMessage()}
                       disabled={!input.trim() || isRunning}

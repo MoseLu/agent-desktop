@@ -249,8 +249,9 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
 
       case 'general':
         return (
+          <div style={{ ...styles.tabContent, maxWidth: '100%' }}>
             {/* 模型选择 */}
-            <Field label="模型" hint="百炼 Coding Plan 的 API Key 和接入地址在"代理配置"中设置">
+            <Field label="模型" hint={'百炼 Coding Plan 的 API Key 和接入地址在"代理配置"中设置'}>
               <select
                 style={styles.select}
                 value={form.model || 'qwen3.5-plus'}
@@ -515,6 +516,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
           </div>
         )
 
+      case 'proxy': {
         const providers = [
           { id: 'qwenCoding', label: '百炼 Coding Plan',  defaultBase: 'https://coding.dashscope.aliyuncs.com/apps/anthropic' },
           { id: 'minimax',   label: 'MiniMax',        defaultBase: 'https://api.minimaxi.com' },
