@@ -318,3 +318,106 @@ There is no `.github/workflows/` or CI configuration. All builds and releases ar
 - All renderer → main communication goes through the preload bridge
 - Workspace path constrains agent file operations — never allow path traversal outside workspace
 - API keys are stored in electron-store (local disk), never transmitted except to Anthropic's API
+
+---
+
+## Pending Development Task: Conversation Persistence + Chat/Code Isolation
+
+> **Status:** Not yet implemented. Picked up from a previous session that ran out of context.
+> **Priority:** High — conversations are currently lost on every app restart.
+
+### Background (Current State)
+
+1. **No persistence** — `Conversation[]` lives only in `App.tsx` `useState`. Closing the app destroys all history.
+2. **No chat/code isolation** — `AppMode` (`'chat' | 'code'`) is a **global app-wide** toggle, not stored per conversation. The same conversation object can be executed in either mode.
+3. `electron-store` currently only persists `Settings`; there are zero IPC handlers for conversations.
+
+### Required Changes
+
+#### 1. Add SQLite via `better-sqlite3`
+
+```bash
+pnpm add better-sqlite3
+pnpm add -D @types/better-sqlite3
+```
+
+Create `electron/db.js` — initializes the DB at `app.getPath('userData')/conversations.db`:
+
+```js
+// Tables:
+// conversations(id TEXT PK, title TEXT, mode TEXT, smart_mode INT, created_at TEXT, updated_at TEXT)
+// messages(id TEXT PK, conversation_id TEXT FK, role TEXT, content TEXT, created_at TEXT)
+```
+
+#### 2. Add IPC Handlers in `electron/main.js`
+
+| Channel | Purpose |
+|---|---|
+| `conversations:list` | Return all conversations (without messages) for sidebar |
+| `conversations:get` | Return one conversation with full messages |
+| `conversations:save` | Upsert a conversation + its messages |
+| `conversations:delete` | Delete conversation and its messages |
+
+#### 3. Expose in `electron/preload.js`
+
+Add to `contextBridge.exposeInMainWorld('electron', { ... })`:
+
+```js
+listConversations: () => ipcRenderer.invoke('conversations:list'),
+getConversation: (id) => ipcRenderer.invoke('conversations:get', id),
+saveConversation: (conv) => ipcRenderer.invoke('conversations:save', conv),
+deleteConversation: (id) => ipcRenderer.invoke('conversations:delete', id),
+```
+
+#### 4. Update `src/types.ts`
+
+Add `mode` field to `Conversation`:
+
+```typescript
+export interface Conversation {
+  id: string
+  title: string
+  messages: Message[]
+  createdAt: Date
+  mode: AppMode          // ← NEW: 'chat' | 'code', stored per conversation
+  tabId?: string
+  parentId?: string
+  smartMode?: boolean
+}
+```
+
+#### 5. Update `src/App.tsx`
+
+- On mount: call `window.electron.listConversations()` to hydrate state from DB
+- On `updateConv`: debounce-save to DB via `window.electron.saveConversation(conv)`
+- On `deleteConv`: call `window.electron.deleteConversation(id)`
+- On `startNewTask()`: store current `mode` into `conversation.mode` at creation time
+
+#### 6. Update `src/components/pages/ChatPage.tsx`
+
+- Read `conversation.mode` (not global `AppMode`) to decide chat vs agent execution path
+- This makes chat/code **per-conversation** — switching the global toggle only affects **new** conversations
+
+#### 7. Update Sidebar
+
+- Show a "chat" vs "code" badge/icon per conversation in the list
+- Optionally: filter/group by mode
+
+### File Touch List
+
+```
+electron/db.js                          ← NEW
+electron/main.js                        ← add DB init + 4 IPC handlers
+electron/preload.js                     ← expose 4 new methods
+src/types.ts                            ← add mode field to Conversation
+src/App.tsx                             ← load from DB on mount, sync on change
+src/components/pages/ChatPage.tsx       ← use conv.mode instead of global mode
+src/components/layout/Sidebar/         ← show mode badge on conversation items
+```
+
+### Notes for Next Session
+
+- `better-sqlite3` is **synchronous** — keep all DB calls in the **main process** only; never import it in the renderer
+- Serialize `messages` as JSON text in the `messages` table (`content` column may contain tool result arrays)
+- The browser mock (`src/electron-mock.ts`) needs stub implementations of the 4 new IPC methods (use `localStorage` for browser dev mode)
+- Run `pnpm typecheck` after changes to catch type regressions
