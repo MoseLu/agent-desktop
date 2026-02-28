@@ -20,9 +20,10 @@ This file provides AI assistants with a comprehensive overview of the Agent Desk
 ```
 agent-desktop/
 ├── .claude/                     # Claude Code configuration
-│   ├── settings.json            # SessionStart hook registration
+│   ├── settings.json            # Hook registrations (SessionStart + PreToolUse)
 │   └── hooks/
-│       └── session-start.sh     # Auto-installs pnpm deps in remote sessions
+│       ├── session-start.sh     # Auto-installs pnpm deps in remote sessions
+│       └── quota-check.sh       # Pre-task API quota check & user confirmation
 ├── electron/                    # Electron main process & agent backend
 │   ├── main.js                  # Window creation, IPC handlers
 │   ├── preload.js               # Security bridge (context isolation)
@@ -250,16 +251,51 @@ Output goes to `dist-electron/`. Windows NSIS installer is the default target.
 
 ## Claude Code Session Setup (`.claude/`)
 
-A `SessionStart` hook is configured to automatically install dependencies when opening this project in a **Claude Code remote (web) session**:
+Two hooks are configured in `.claude/settings.json`:
 
 ```
 .claude/
-├── settings.json          # Registers the SessionStart hook
+├── settings.json          # Registers SessionStart + PreToolUse hooks
 └── hooks/
-    └── session-start.sh   # Runs pnpm install on remote session start
+    ├── session-start.sh   # Runs pnpm install on remote session start
+    └── quota-check.sh     # Checks API quota before each task
 ```
 
-The hook only activates in remote environments (`$CLAUDE_CODE_REMOTE=true`) and is safe to run multiple times (idempotent). It runs **synchronously**, ensuring all packages are installed before the session begins.
+### SessionStart — `session-start.sh`
+
+Auto-installs pnpm dependencies when opening the project in a **Claude Code remote (web) session**. Only activates when `$CLAUDE_CODE_REMOTE=true`. Idempotent and synchronous.
+
+### PreToolUse — `quota-check.sh`
+
+Runs automatically before the first tool call of each new task. It:
+
+1. Calls the Anthropic API with a minimal request to read rate-limit response headers
+2. Parses `anthropic-ratelimit-tokens-remaining` and `anthropic-ratelimit-tokens-limit`
+3. Estimates token consumption based on the tool type (e.g. `Agent` ≈ 20 000, `Bash` ≈ 10 000)
+4. Takes one of three actions:
+
+| Quota level | Condition | Action |
+|---|---|---|
+| Sufficient | ≥ 25 % remaining **and** remaining ≥ estimated | Print summary, proceed |
+| Low | < 25 % remaining but remaining ≥ estimated | Ask user `[Y/n]` via terminal; cancel on `n` |
+| Insufficient | remaining < estimated tokens | Block tool use, show reset time |
+
+**De-duplication:** uses a 60-second timestamp file (`/tmp/.claude_quota_<USER>`) so only the first tool call per task pays the network cost; subsequent tool calls in the same turn skip the check.
+
+**Required environment variable:** `ANTHROPIC_API_KEY` must be set. If absent the hook exits immediately without blocking.
+
+**Example terminal output (sufficient quota):**
+```
+━━ API 配额检查 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  配额总量  : 200000 tokens/分钟
+  当前剩余  : 165000 tokens  [████████░░░░░░░░░░░░] 17% 已用
+  窗口重置  : 2026-02-28T10:01:00Z
+  ─────────────────────────────────────────────────
+  当前工具  : Bash
+  预估消耗  : ~10000 tokens
+  判断结果  : ✅ 配额充足
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ---
 
