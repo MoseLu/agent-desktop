@@ -277,6 +277,52 @@ function AppContent() {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...updater(c) } : c))
   }, [])
 
+  // 获取同一分支树的所有会话（找到根节点后递归收集所有子节点）
+  const getBranchFamily = useCallback((convId: string): Conversation[] => {
+    let rootId = convId
+    let current = conversations.find(c => c.id === convId)
+    while (current?.parentId) {
+      rootId = current.parentId
+      current = conversations.find(c => c.id === current!.parentId)
+    }
+    const result: Conversation[] = []
+    function collect(id: string) {
+      const conv = conversations.find(c => c.id === id)
+      if (conv) result.push(conv)
+      conversations.filter(c => c.parentId === id).forEach(c => collect(c.id))
+    }
+    collect(rootId)
+    return result.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  }, [conversations])
+
+  // 从当前会话创建分支会话
+  const createBranch = useCallback((fromConversationId: string) => {
+    const fromConv = conversations.find(c => c.id === fromConversationId)
+    if (!fromConv) return
+
+    const id = `branch-${Date.now()}`
+    const tabId = `tab-${Date.now() + 1}`
+    const branchConv: Conversation = {
+      id,
+      title: `${fromConv.title} · 分支`,
+      messages: fromConv.messages.filter(m => !m.streaming).map(m => ({ ...m })),
+      createdAt: new Date(),
+      parentId: fromConversationId,
+      tabId,
+    }
+    const newTab: Tab = {
+      id: tabId,
+      title: branchConv.title,
+      conversationId: id,
+      isDefault: false,
+    }
+    setConversations(prev => [...prev, branchConv])
+    setTabs(prev => [...prev, newTab])
+    setActiveTabId(tabId)
+    setActiveId(id)
+    setPage('chat')
+  }, [conversations])
+
   const deleteConv = (id: string) => {
     setConversations(prev => prev.filter(c => c.id !== id))
     if (activeId === id) {
@@ -329,6 +375,9 @@ function AppContent() {
               conversation={activeConv}
               settings={settings}
               onUpdate={(updater) => updateConv(activeId!, updater)}
+              branchConversations={getBranchFamily(activeId!)}
+              onCreateBranch={() => createBranch(activeId!)}
+              onSelectConversation={selectConversation}
             />
           ) : (
             <HomePage

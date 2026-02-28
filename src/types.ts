@@ -50,6 +50,7 @@ export interface Conversation {
   messages: Message[]
   createdAt: Date
   tabId?: string  // 关联的标签 ID
+  parentId?: string  // 父会话 ID（分支会话时设置）
 }
 
 export interface Tab {

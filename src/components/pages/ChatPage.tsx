@@ -14,19 +14,36 @@ import {
 import { ArrowUpOutlined } from '@ant-design/icons'
 import { isElectron, callElectron } from '@utils/env'
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatRelativeTime(date: Date): string {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins} 分钟前`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} 天前`
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
 interface Props {
   conversation: Conversation
   settings: Settings
   onUpdate: (updater: (c: Conversation) => Partial<Conversation>) => void
+  branchConversations?: Conversation[]
+  onCreateBranch?: () => void
+  onSelectConversation?: (id: string) => void
 }
 
-export default function ChatPage({ conversation, settings, onUpdate }: Props) {
+export default function ChatPage({ conversation, settings, onUpdate, branchConversations, onCreateBranch, onSelectConversation }: Props) {
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [isSmartMode, setIsSmartMode] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
+  const historyPanelRef = useRef<HTMLDivElement>(null)
 
   const messages = conversation.messages
 
@@ -105,11 +122,22 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
       // 浏览器模式下不注册事件监听器
       return
     }
-    
+
     const cleanup = window.electron.onAgentEvent(handleAgentEvent)
     cleanupRef.current = cleanup
     return () => cleanup()
   }, [handleAgentEvent])
+
+  useEffect(() => {
+    if (!showHistory) return
+    const handler = (e: MouseEvent) => {
+      if (historyPanelRef.current && !historyPanelRef.current.contains(e.target as Node)) {
+        setShowHistory(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showHistory])
 
   const sendMessage = async (content = input.trim()) => {
     if (!content || isRunning) return
@@ -147,6 +175,58 @@ export default function ChatPage({ conversation, settings, onUpdate }: Props) {
 
   return (
     <div style={styles.page}>
+      {/* 右上角悬浮操作按钮 */}
+      <div ref={historyPanelRef} style={floatStyles.container}>
+        <button
+          style={floatStyles.btn}
+          title="创建分支会话"
+          onClick={() => onCreateBranch?.()}
+        >
+          <PlusIcon />
+        </button>
+        <button
+          style={{ ...floatStyles.btn, ...(showHistory ? floatStyles.btnActive : {}) }}
+          title="分支历史"
+          onClick={() => setShowHistory(p => !p)}
+        >
+          <HistoryIcon />
+        </button>
+
+        {showHistory && (
+          <div style={floatStyles.panel}>
+            <div style={floatStyles.panelHeader}>分支历史</div>
+            <div style={floatStyles.list}>
+              {(branchConversations ?? []).map(conv => {
+                const isCurrent = conv.id === conversation.id
+                return (
+                  <button
+                    key={conv.id}
+                    style={{ ...floatStyles.item, ...(isCurrent ? floatStyles.itemActive : {}) }}
+                    onClick={() => { onSelectConversation?.(conv.id); setShowHistory(false) }}
+                  >
+                    <span style={floatStyles.itemTitle}>{conv.title}</span>
+                    <span style={floatStyles.itemMeta}>
+                      {isCurrent ? 'Current Chat' : formatRelativeTime(conv.createdAt)}
+                    </span>
+                  </button>
+                )
+              })}
+              {(!branchConversations || branchConversations.length === 0) && (
+                <div style={floatStyles.empty}>暂无历史记录</div>
+              )}
+            </div>
+            <div style={floatStyles.panelDivider} />
+            <button
+              style={floatStyles.createBtn}
+              onClick={() => { onCreateBranch?.(); setShowHistory(false) }}
+            >
+              <PlusIcon size={12} />
+              <span>创建分支会话</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       <div style={styles.messages}>
         {messages.map((msg, i) => (
           <MessageBubble key={i} message={msg} />
@@ -306,6 +386,23 @@ function ThinkingDots() {
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
+function PlusIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <path d="M7 2V12M2 7H12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function HistoryIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M7 4.5V7L9 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function AvatarIcon() {
   return (
     <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -343,7 +440,7 @@ function MiniChevron({ open }: { open: boolean }) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden' },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden', position: 'relative' },
   messages: { flex: 1, overflowY: 'auto', padding: '24px 0' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
@@ -478,4 +575,112 @@ const toolStyles: Record<string, React.CSSProperties> = {
 
 const mdStyles: Record<string, React.CSSProperties> = {
   p: { fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.7, margin: '2px 0' },
+}
+
+const floatStyles: Record<string, React.CSSProperties> = {
+  container: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    display: 'flex',
+    gap: 6,
+    zIndex: 10,
+  },
+  btn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    border: '1px solid var(--border-medium)',
+    background: 'var(--bg-primary)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--text-secondary)',
+    transition: 'all 0.15s ease',
+    padding: 0,
+  },
+  btnActive: {
+    background: 'var(--bg-secondary)',
+    borderColor: 'var(--border-strong)',
+    color: 'var(--text-primary)',
+  },
+  panel: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    width: 240,
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-medium)',
+    borderRadius: 10,
+    boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+    overflow: 'hidden',
+  },
+  panelHeader: {
+    padding: '10px 14px 8px',
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--text-tertiary)',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase' as const,
+    borderBottom: '1px solid var(--border-light)',
+  },
+  list: {
+    maxHeight: 240,
+    overflowY: 'auto',
+  },
+  item: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+    padding: '9px 14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'background 0.12s',
+  },
+  itemActive: {
+    background: 'var(--bg-secondary)',
+  },
+  itemTitle: {
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    width: '100%',
+    fontWeight: 500,
+  },
+  itemMeta: {
+    fontSize: 11,
+    color: 'var(--text-tertiary)',
+  },
+  empty: {
+    padding: '14px',
+    fontSize: 13,
+    color: 'var(--text-tertiary)',
+    textAlign: 'center',
+  },
+  panelDivider: {
+    height: 1,
+    background: 'var(--border-light)',
+    margin: '0',
+  },
+  createBtn: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '10px 14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: 'var(--text-secondary)',
+    fontFamily: 'inherit',
+    transition: 'background 0.12s',
+  },
 }
