@@ -4,7 +4,7 @@ export interface FolderPermission {
 }
 
 export interface Settings {
-  apiKey: string
+  apiKey?: string
   workspace: string
   model: string
   maxSteps: number
@@ -84,7 +84,7 @@ declare global {
       getAutoLaunch: () => Promise<{ openAtLogin: boolean }>
       // Agent Hub (多 Agent 支持)
       checkAvailableAgents: () => Promise<string[]>
-      testAgent: (params: { model: string; apiKey: string }) => Promise<{ success: boolean; content?: string; error?: string }>
+      testAgent: (params: { model: string }) => Promise<{ success: boolean; content?: string; error?: string }>
       selectBestAgent: () => Promise<{ success: boolean; agent?: string; error?: string }>
     }
   }

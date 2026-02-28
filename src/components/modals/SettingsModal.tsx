@@ -21,7 +21,6 @@ interface Props {
 
 export default function SettingsModal({ initial, onSave, onClose, onScheduledTasks }: Props) {
   const [form, setForm] = useState({ ...initial })
-  const [showKey, setShowKey] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
@@ -226,101 +225,8 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       case 'general':
         return (
           <div style={styles.tabContent}>
-            {/* CCSwith 代理模式 */}
-            <DesktopRow
-              label="使用 CCSwith 代理"
-              desc="通过本地 CCSwith 代理调用 API（无需配置 API Key）"
-              control={
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={form.useCCSwith ?? false} 
-                    onChange={e => set('useCCSwith', e.target.checked)} 
-                  />
-                  <span className="slider"></span>
-                </label>
-              }
-            />
-
-            {/* CCSwith 代理地址（仅当启用时显示） */}
-            {form.useCCSwith && (
-              <Field label="CCSwith 代理地址" hint="默认：127.0.0.1:8888">
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={form.ccswithAddress || '127.0.0.1:8888'}
-                  onChange={e => set('ccswithAddress', e.target.value)}
-                  placeholder="127.0.0.1:8888"
-                />
-              </Field>
-            )}
-
-            {/* API Key（仅当未启用 CCSwith 时显示） */}
-            {!form.useCCSwith && (
-              <>
-                <Field label="API Key" required hint="支持 MiniMax / 通义千问 (Qwen) / Claude / OpenAI 的 API Key">
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div style={{ flex: 1, display: 'flex', gap: 6 }}>
-                      <input
-                        type={showKey ? 'text' : 'password'}
-                        style={{ ...styles.input, flex: 1 }}
-                        value={form.apiKey || ''}
-                        onChange={e => set('apiKey', e.target.value)}
-                        placeholder="输入 API Key"
-                      />
-                      <button
-                        style={styles.toggleBtn}
-                        onClick={() => setShowKey(v => !v)}
-                        title="切换显示/隐藏"
-                      >
-                        {showKey ? '隐藏' : '显示'}
-                      </button>
-                    </div>
-                    <button
-                      style={{
-                        ...styles.toggleBtn,
-                        minWidth: 50,
-                      }}
-                      onClick={async () => {
-                        if (!form.apiKey) {
-                          message.warning('请先输入 API Key', 2000)
-                          return
-                        }
-                        if (!isElectron()) {
-                          message.warning('请在桌面版中使用此功能', 2000)
-                          return
-                        }
-                        
-                        // 显示加载状态
-                        message.info('正在测试连接...', 1000)
-                        
-                        try {
-                          const result = await window.electron.testAgent({
-                            model: form.model,
-                            apiKey: form.apiKey,
-                          })
-                          
-                          if (result.success) {
-                            message.success('✅ 连接成功！', 3000)
-                          } else {
-                            message.error(`❌ 连接失败：${result.error}`, 5000)
-                          }
-                        } catch (error) {
-                          message.error('测试失败：' + (error as Error).message, 5000)
-                        }
-                      }}
-                      disabled={!form.apiKey}
-                      title={!form.apiKey ? '请先输入 API Key' : '测试连接'}
-                    >
-                      测试
-                    </button>
-                  </div>
-                </Field>
-              </>
-            )}
-
             {/* 模型选择 */}
-            <Field label="模型">
+            <Field label="模型" hint="API Key 及接入地址通过环境变量 ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL 配置">
               <select
                 style={styles.select}
                 value={form.model || 'MiniMax-M2.5'}
@@ -332,11 +238,12 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
                 </optgroup>
                 <optgroup label="通义千问 Qwen">
                   <option value="qwen3-coder-next">Qwen3 Coder Next（最新编程）</option>
+                  <option value="qwen3.5-plus">Qwen3.5 Plus</option>
                   <option value="qwen-plus">Qwen Plus</option>
                   <option value="qwen-max">Qwen Max</option>
                   <option value="qwen-turbo">Qwen Turbo</option>
                 </optgroup>
-                <optgroup label="Claude（需 Anthropic Key，仅 Electron）">
+                <optgroup label="Claude">
                   <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
                   <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
                 </optgroup>

@@ -14,9 +14,12 @@ class AgentService {
   }
 
   _getConfig() {
+    // API Key 优先从环境变量读取，保持与 Coding Plan / MiniMax 配置方式一致
+    const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || ''
+    const defaultModel = process.env.ANTHROPIC_MODEL || 'MiniMax-M2.5'
     return {
-      apiKey:   this.store.get('apiKey',   ''),
-      model:    this.store.get('model',    'claude-sonnet-4-20250514'),
+      apiKey,
+      model:    this.store.get('model',    defaultModel),
       maxSteps: this.store.get('maxSteps', 50),
     }
   }
@@ -29,7 +32,7 @@ class AgentService {
    */
   async run(conversationId, { messages, workspace }, onEvent) {
     const { apiKey, model, maxSteps } = this._getConfig()
-    if (!apiKey) return { error: '请先在设置中填写 API Key' }
+    if (!apiKey) return { error: '请配置 ANTHROPIC_AUTH_TOKEN 环境变量后重启应用' }
 
     // 同一对话已有运行中的 loop → 先停止
     this.stop(conversationId)

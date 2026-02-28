@@ -5,7 +5,7 @@
  */
 
 interface Settings {
-  apiKey: string;
+  apiKey?: string;
   workspace: string;
   model: string;
   maxSteps: number;
@@ -58,16 +58,6 @@ interface ElectronAPI {
   openExternal: (url: string) => Promise<void>;
 }
 
-// ─── 模型检测工具 ────────────────────────────────────────────────────────────
-
-function isMiniMaxModel(model: string): boolean {
-  return !!(model?.toLowerCase().includes('minimax'))
-}
-
-function isQwenModel(model: string): boolean {
-  return !!(model?.toLowerCase().includes('qwen') || model?.toLowerCase().includes('qwq'))
-}
-
 // ─── 全局事件总线（替代随机 interval） ────────────────────────────────────────
 
 let agentEventListeners: Array<(ev: AgentEvent) => void> = []
@@ -79,64 +69,6 @@ function emitAgentEvent(ev: AgentEvent) {
   })
 }
 
-// ─── API 调用函数 ─────────────────────────────────────────────────────────────
-
-async function callMiniMaxAPI(
-  apiKey: string,
-  model: string,
-  messages: Pick<Message, 'role' | 'content'>[]
-): Promise<string> {
-  const response = await fetch('https://api.minimaxi.com/anthropic/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 8096,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-    }),
-  })
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}))
-    throw new Error(`MiniMax API 错误 (${response.status}): ${(errData as any).error?.message || response.statusText}`)
-  }
-
-  const data = await response.json() as any
-  return data.content
-    ?.filter((b: any) => b.type === 'text')
-    ?.map((b: any) => b.text)
-    ?.join('') ?? ''
-}
-
-async function callQwenAPI(
-  apiKey: string,
-  model: string,
-  messages: Pick<Message, 'role' | 'content'>[]
-): Promise<string> {
-  const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-    }),
-  })
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}))
-    throw new Error(`Qwen API 错误 (${response.status}): ${(errData as any).error?.message || response.statusText}`)
-  }
-
-  const data = await response.json() as any
-  return data.choices?.[0]?.message?.content ?? ''
-}
-
 // ─── Mock 工厂 ────────────────────────────────────────────────────────────────
 
 const createMockElectron = (): ElectronAPI => {
@@ -145,7 +77,6 @@ const createMockElectron = (): ElectronAPI => {
   const SETTINGS_KEY = 'electron-settings'
 
   let settings: Settings = {
-    apiKey: '',
     workspace: '/workspace',
     model: 'MiniMax-M2.5',
     maxSteps: 20,

@@ -40,28 +40,18 @@ async function initStore() {
   checkAvailableAgents()
 }
 
-// 检查并注册可用的 Agent
+// 检查并注册可用的 Agent（API Key 来自环境变量）
 async function checkAvailableAgents() {
-  const apiKeys = {
-    minimax: store.get('apiKey', ''),
-    qwen: store.get('qwenApiKey', ''),
-    claude: store.get('claudeApiKey', ''),
-    openai: store.get('openaiApiKey', ''),
-  }
-  
+  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || ''
   const model = store.get('model', '')
-  
-  // 根据当前选择的模型注册对应的 Agent
-  if (model) {
-    const apiKey = apiKeys.minimax || apiKeys.qwen || apiKeys.claude || apiKeys.openai
-    if (apiKey) {
-      try {
-        const adapter = agentHub.getAdapter(model, apiKey)
-        const available = await adapter.isAvailable()
-        console.log(`[Main] Agent ${model} 可用性：${available ? '✅' : '❌'}`)
-      } catch (error) {
-        console.warn(`[Main] 初始化 Agent ${model} 失败:`, error.message)
-      }
+
+  if (model && apiKey) {
+    try {
+      const adapter = agentHub.getAdapter(model, apiKey)
+      const available = await adapter.isAvailable()
+      console.log(`[Main] Agent ${model} 可用性：${available ? '✅' : '❌'}`)
+    } catch (error) {
+      console.warn(`[Main] 初始化 Agent ${model} 失败:`, error.message)
     }
   }
 }
@@ -151,7 +141,6 @@ app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) creat
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 ipcMain.handle('get-settings', () => ({
-  apiKey: store.get('apiKey', ''),
   workspace: store.get('workspace', app.getPath('home')),
   model: store.get('model', 'claude-sonnet-4-20250514'),
   maxSteps: store.get('maxSteps', 50),
@@ -221,46 +210,35 @@ ipcMain.handle('agent-stop', (_, conversationId) => {
 
 // ─── Agent Hub (新增多 Agent 支持) ────────────────────────────────────────────
 
-// 检查可用的 Agent
+// 检查可用的 Agent（API Key 来自环境变量）
 ipcMain.handle('agent:check-available', async () => {
-  const apiKeys = {
-    minimax: store.get('apiKey', ''),
-    qwen: store.get('qwenApiKey', ''),
-    claude: store.get('claudeApiKey', ''),
-    openai: store.get('openaiApiKey', ''),
-  }
-  
-  const available = []
-  for (const [name, apiKey] of Object.entries(apiKeys)) {
-    if (!apiKey) continue
-    
-    try {
-      const modelName = name === 'minimax' ? 'MiniMax-M2.5' 
-        : name === 'qwen' ? 'qwen3-coder-next'
-        : name === 'claude' ? 'claude-sonnet-4-20250514'
-        : 'gpt-4-turbo'
-      
-      if (await agentHub.checkAvailability(modelName, apiKey)) {
-        available.push(name)
-      }
-    } catch (error) {
-      console.warn(`[Main] 检查 ${name} 失败:`, error.message)
+  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || ''
+  if (!apiKey) return []
+
+  const model = store.get('model', 'MiniMax-M2.5')
+  try {
+    if (await agentHub.checkAvailability(model, apiKey)) {
+      return ['configured']
     }
+  } catch (error) {
+    console.warn(`[Main] 检查 Agent 失败:`, error.message)
   }
-  
-  return available
+  return []
 })
 
-// 测试指定 Agent
-ipcMain.handle('agent:test', async (_, { model, apiKey }) => {
+// 测试指定 Agent（API Key 来自环境变量）
+ipcMain.handle('agent:test', async (_, { model }) => {
+  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || ''
+  if (!apiKey) return { success: false, error: '未配置 ANTHROPIC_AUTH_TOKEN 环境变量' }
+
   try {
     const adapter = agentHub.getAdapter(model, apiKey)
     const response = await adapter.chat({
       messages: [{ role: 'user', content: '你好，请用一句话介绍自己' }],
       maxTokens: 100,
     })
-    return { 
-      success: true, 
+    return {
+      success: true,
       content: response.content,
       usage: response.usage,
     }
@@ -269,27 +247,18 @@ ipcMain.handle('agent:test', async (_, { model, apiKey }) => {
   }
 })
 
-// 智能选择最佳 Agent
+// 智能选择最佳 Agent（API Key 来自环境变量）
 ipcMain.handle('agent:select-best', async () => {
-  const apiKeys = {
-    minimax: store.get('apiKey', ''),
-    qwen: store.get('qwenApiKey', ''),
-    claude: store.get('claudeApiKey', ''),
-    openai: store.get('openaiApiKey', ''),
-  }
-  
-  // 过滤掉空的 API Key
-  const validKeys = {}
-  for (const [key, value] of Object.entries(apiKeys)) {
-    if (value) validKeys[key] = value
-  }
-  
+  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || ''
+  if (!apiKey) return { success: false, error: '未配置 ANTHROPIC_AUTH_TOKEN 环境变量' }
+
+  const model = store.get('model', 'MiniMax-M2.5')
   try {
     const bestAgent = await agentHub.selectBestAgent(
       { messages: [{ role: 'user', content: 'test' }] },
-      validKeys
+      { configured: apiKey }
     )
-    return { success: true, agent: bestAgent }
+    return { success: true, agent: bestAgent || model }
   } catch (error) {
     return { success: false, error: error.message }
   }
@@ -313,35 +282,32 @@ ipcMain.handle('open-in-explorer', (_, p) => shell.showItemInFolder(p))
 ipcMain.handle('open-external', (_, url) => shell.openExternal(url))
 
 // ─── Chat Message Proxy (bypasses renderer CORS) ──────────────────────────────
-ipcMain.handle('chat-message', async (_, { provider, apiKey, model, messages }) => {
-  try {
-    let url, headers, body
+// API Key 和 Base URL 来自环境变量，与 Coding Plan / MiniMax 配置方式一致
+ipcMain.handle('chat-message', async (_, { model, messages }) => {
+  const apiKey  = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || ''
+  const baseURL = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'
 
-    if (provider === 'minimax') {
-      url = 'https://api.minimaxi.com/anthropic/v1/messages'
-      headers = {
+  if (!apiKey) {
+    return { ok: false, error: '未配置 ANTHROPIC_AUTH_TOKEN 环境变量' }
+  }
+
+  try {
+    const url = `${baseURL.replace(/\/$/, '')}/v1/messages`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-      }
-      body = JSON.stringify({
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
         model,
         max_tokens: 8096,
         messages: messages
           .filter(m => m.role !== 'system')
           .map(m => ({ role: m.role, content: m.content })),
-      })
-    } else if (provider === 'qwen') {
-      url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
-      headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      }
-      body = JSON.stringify({ model, messages })
-    } else {
-      return { ok: false, error: `Unsupported provider: ${provider}` }
-    }
-
-    const res = await fetch(url, { method: 'POST', headers, body })
+      }),
+    })
     const data = await res.json()
     return { ok: res.ok, status: res.status, data }
   } catch (err) {
