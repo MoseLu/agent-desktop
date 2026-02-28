@@ -226,6 +226,49 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       case 'general':
         return (
           <div style={styles.tabContent}>
+            {/* API Key */}
+            <Field label="API Key" required hint="支持 MiniMax / 通义千问 (Qwen) 的 API Key">
+              <div style={styles.inputGroup}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  style={{ ...styles.input, flex: 1 }}
+                  value={form.apiKey || ''}
+                  onChange={e => set('apiKey', e.target.value)}
+                  placeholder="输入 MiniMax 或 Qwen API Key"
+                />
+                <button
+                  style={styles.toggleBtn}
+                  onClick={() => setShowKey(v => !v)}
+                >
+                  {showKey ? '隐藏' : '显示'}
+                </button>
+              </div>
+            </Field>
+
+            {/* 模型选择 */}
+            <Field label="模型">
+              <select
+                style={styles.select}
+                value={form.model || 'MiniMax-M2.5'}
+                onChange={e => set('model', e.target.value)}
+              >
+                <optgroup label="MiniMax">
+                  <option value="MiniMax-M2.5">MiniMax M2.5（推荐）</option>
+                  <option value="MiniMax-Text-01">MiniMax Text-01</option>
+                </optgroup>
+                <optgroup label="通义千问 Qwen">
+                  <option value="qwen3-coder-next">Qwen3 Coder Next（最新编程）</option>
+                  <option value="qwen-plus">Qwen Plus</option>
+                  <option value="qwen-max">Qwen Max</option>
+                  <option value="qwen-turbo">Qwen Turbo</option>
+                </optgroup>
+                <optgroup label="Claude（需 Anthropic Key，仅 Electron）">
+                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                  <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                </optgroup>
+              </select>
+            </Field>
+
             <Field label="外观">
               <div style={styles.themeCards}>
                 {([

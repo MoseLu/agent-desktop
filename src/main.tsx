@@ -1,3 +1,4 @@
+import './electron-mock' // 浏览器环境注入 window.electron mock（必须最先加载）
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
