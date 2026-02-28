@@ -48,6 +48,7 @@ export function ExpandedSidebar({
         isOpen={taskRecordOpen}
         onSelect={props.onSelect}
         onDelete={props.onDelete}
+        onRename={props.onRename}
         onToggle={() => setTaskRecordOpen(p => !p)}
       />
 

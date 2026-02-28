@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import type { Settings, Conversation, Tab, AppMode, ModelOption } from '@types'
+import type { Settings, Conversation, Tab, AppMode, ModelOption, ScheduledTask } from '@types'
 import { ThemeProvider, useTheme } from '@contexts/ThemeProvider'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
@@ -19,6 +19,7 @@ function AppContent() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [page, setPage] = useState<'home' | 'chat' | 'scheduled-tasks'>('home')
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([])
   const { setTheme } = useTheme()
 
   // 标签栏状态
@@ -358,6 +359,20 @@ function AppContent() {
     }
   }
 
+  const renameConv = useCallback((id: string, newTitle: string) => {
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c))
+    setTabs(prev => prev.map(t => t.conversationId === id ? { ...t, title: newTitle } : t))
+  }, [])
+
+  const addScheduledTask = useCallback((data: Omit<ScheduledTask, 'id' | 'createdAt'>) => {
+    const task: ScheduledTask = {
+      ...data,
+      id: Date.now().toString(),
+      createdAt: new Date(),
+    }
+    setScheduledTasks(prev => [task, ...prev])
+  }, [])
+
   const goHome = () => { setActiveId(null); setPage('home') }
 
   if (!settings) {
@@ -391,6 +406,7 @@ function AppContent() {
           onSelect={selectConversation}
           onNewTask={handleSidebarNewTask}
           onDelete={deleteConv}
+          onRename={renameConv}
           onSettings={() => setShowSettings(true)}
           onSearch={() => setShowSearch(true)}
           onScheduledTasks={() => { setPage('scheduled-tasks'); setActiveId(null) }}
@@ -398,7 +414,11 @@ function AppContent() {
 
         <main style={styles.main}>
           {page === 'scheduled-tasks' ? (
-            <ScheduledTasksPage onBack={goHome} />
+            <ScheduledTasksPage
+            onBack={goHome}
+            tasks={scheduledTasks}
+            onAddTask={addScheduledTask}
+          />
           ) : page === 'chat' && activeConv ? (
             <ChatPage
               key={activeId!}

@@ -137,7 +137,7 @@ function DrumPicker({ items, initialIdx, onChange }: DrumPickerProps) {
 interface TaskData {
   name: string
   description: string
-  frequency: string
+  frequency: 'daily' | 'weekly' | 'interval'
   weekday?: number
   scheduledTime?: string
   intervalValue?: number
@@ -153,7 +153,7 @@ interface Props {
 export default function NewScheduledTaskModal({ onClose, onConfirm }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [frequency, setFrequency] = useState('daily') // 'daily' | 'weekly' | 'interval'
+  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'interval'>('daily')
   const [weekday, setWeekday] = useState(0)
 
   // Time picker state
@@ -295,7 +295,7 @@ export default function NewScheduledTaskModal({ onClose, onConfirm }: Props) {
                     style={s.select}
                     value={frequency}
                     onChange={e => {
-                      setFrequency(e.target.value)
+                      setFrequency(e.target.value as 'daily' | 'weekly' | 'interval')
                       // 切换频率类型时清空之前的选择
                       if (e.target.value !== 'interval') {
                         setConfirmedInterval(null)

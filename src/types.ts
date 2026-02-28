@@ -77,6 +77,18 @@ export interface Conversation {
   smartMode?: boolean  // 全能模式(true) / 高效模式(false)，在首页选择后锁定
 }
 
+export interface ScheduledTask {
+  id: string
+  name: string
+  description: string
+  frequency: 'daily' | 'weekly' | 'interval'
+  weekday?: number
+  scheduledTime?: string
+  intervalValue?: number
+  intervalUnit?: 'hour' | 'minute'
+  createdAt: Date
+}
+
 export interface Tab {
   id: string
   title: string

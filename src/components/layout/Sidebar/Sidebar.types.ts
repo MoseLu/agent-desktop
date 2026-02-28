@@ -8,6 +8,7 @@ export interface SidebarProps {
   onSelect: (id: string) => void
   onNewTask: () => void
   onDelete: (id: string) => void
+  onRename: (id: string, newTitle: string) => void
   onSettings: () => void
   onSearch: () => void
   onScheduledTasks: () => void
@@ -36,6 +37,7 @@ export interface TaskListProps {
   isOpen: boolean
   onSelect: (id: string) => void
   onDelete: (id: string) => void
+  onRename: (id: string, newTitle: string) => void
   onToggle: () => void
 }
 

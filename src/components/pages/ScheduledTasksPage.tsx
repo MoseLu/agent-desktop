@@ -2,12 +2,27 @@ import React, { useState } from 'react'
 import { InfoIcon, AlarmCheckIcon } from '@ui'
 import NewScheduledTaskModal from '@modals/NewScheduledTaskModal'
 import { appConfig } from '@config'
+import type { ScheduledTask } from '@types'
 
 interface Props {
   onBack?: () => void
+  tasks: ScheduledTask[]
+  onAddTask: (data: Omit<ScheduledTask, 'id' | 'createdAt'>) => void
 }
 
-export default function ScheduledTasksPage({ onBack }: Props) {
+function frequencyLabel(task: ScheduledTask): string {
+  if (task.frequency === 'weekly') {
+    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    return `每周${days[task.weekday ?? 0]} ${task.scheduledTime ?? ''}`
+  }
+  if (task.frequency === 'interval') {
+    const unit = task.intervalUnit === 'hour' ? '小时' : '分钟'
+    return `每 ${task.intervalValue} ${unit}`
+  }
+  return `每天 ${task.scheduledTime ?? ''}`
+}
+
+export default function ScheduledTasksPage({ onBack, tasks, onAddTask }: Props) {
   const [showCreate, setShowCreate] = useState(false)
 
   return (
@@ -35,24 +50,48 @@ export default function ScheduledTasksPage({ onBack }: Props) {
         </span>
       </div>
 
-      {/* Empty state */}
-      <div style={styles.emptyState}>
-        <div style={styles.clockIcon}>
-          <AlarmCheckIcon size={56} style={{ color: 'var(--text-tertiary)', opacity: 0.35 }} />
+      {tasks.length === 0 ? (
+        /* Empty state */
+        <div style={styles.emptyState}>
+          <div style={styles.clockIcon}>
+            <AlarmCheckIcon size={56} style={{ color: 'var(--text-tertiary)', opacity: 0.35 }} />
+          </div>
+          <div style={styles.emptyTitle}>开始添加定时任务</div>
+          <div style={styles.emptyDesc}>安排未来任务，让{appConfig.appName}代理按时处理您的日常工作。</div>
+          <button style={styles.addBtn} onClick={() => setShowCreate(true)}>
+            <span style={{ fontSize: 16, lineHeight: 1, marginRight: 4 }}>+</span>
+            新建定时任务
+          </button>
         </div>
-        <div style={styles.emptyTitle}>开始添加定时任务</div>
-        <div style={styles.emptyDesc}>安排未来任务，让{appConfig.appName}代理按时处理您的日常工作。</div>
-        <button style={styles.addBtn} onClick={() => setShowCreate(true)}>
-          <span style={{ fontSize: 16, lineHeight: 1, marginRight: 4 }}>+</span>
-          新建定时任务
-        </button>
-      </div>
+      ) : (
+        /* Task list */
+        <div style={styles.listContainer}>
+          <div style={styles.listHeader}>
+            <span style={styles.listCount}>{tasks.length} 个任务</span>
+            <button style={styles.addBtnSmall} onClick={() => setShowCreate(true)}>
+              <span style={{ fontSize: 15, lineHeight: 1, marginRight: 3 }}>+</span>
+              新建
+            </button>
+          </div>
+          <div style={styles.taskList}>
+            {tasks.map(task => (
+              <div key={task.id} style={styles.taskCard}>
+                <div style={styles.taskCardTitle}>{task.name}</div>
+                {task.description && (
+                  <div style={styles.taskCardDesc}>{task.description}</div>
+                )}
+                <div style={styles.taskCardMeta}>{frequencyLabel(task)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showCreate && (
         <NewScheduledTaskModal
           onClose={() => setShowCreate(false)}
-          onConfirm={(_data) => {
-            // TODO: persist task
+          onConfirm={(data) => {
+            onAddTask(data)
             setShowCreate(false)
           }}
         />
@@ -155,5 +194,68 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: 'inherit',
   },
+  listContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  listHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0 28px 12px',
+    flexShrink: 0,
+  },
+  listCount: {
+    fontSize: 13,
+    color: 'var(--text-tertiary)',
+  },
+  addBtnSmall: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '6px 14px',
+    background: 'var(--text-primary)',
+    color: 'var(--bg-primary)',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  taskList: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '0 28px 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  taskCard: {
+    padding: '14px 16px',
+    border: '1px solid var(--border-light)',
+    borderRadius: 10,
+    background: 'var(--bg-secondary)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  taskCardTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+  },
+  taskCardDesc: {
+    fontSize: 13,
+    color: 'var(--text-secondary)',
+    lineHeight: 1.5,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  },
+  taskCardMeta: {
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
+    marginTop: 2,
+  },
 }
-

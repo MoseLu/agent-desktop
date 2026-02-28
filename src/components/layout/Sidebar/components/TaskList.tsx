@@ -182,7 +182,7 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
   )
 }
 
-export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, onToggle }: TaskListProps) {
+export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, onRename, onToggle }: TaskListProps) {
   const [hoverId, setHoverId] = React.useState<string | null>(null)
   // 只显示根会话，子会话（分支）在 ChatPage 内的 tab 栏中展示
   const rootConversations = conversations.filter(c => !c.parentId)
@@ -208,8 +208,7 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
   }
 
   const handleRename = (id: string, newTitle: string) => {
-    // TODO: 调用后端 API 更新任务标题
-    console.log('重命名任务:', id, newTitle)
+    onRename(id, newTitle)
     message.success('重命名成功')
   }
 
