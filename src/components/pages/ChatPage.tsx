@@ -159,11 +159,10 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
       onUpdate(() => ({ title: content.slice(0, 30) }))
     }
 
-    // ─── Chat 模式：直接调 API，浏览器 / Electron 均可 ──────────────────────
+    // ─── Chat 模式：通过主进程 IPC 调用 API（API Key 来自环境变量）────────────
     if (mode === 'chat') {
       try {
         const text = await sendChatMessage(
-          settings.apiKey,
           settings.model,
           updated.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
         )
