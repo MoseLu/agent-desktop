@@ -210,56 +210,58 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
 
   return (
     <div style={styles.page}>
-      {/* 右上角悬浮操作按钮 */}
-      <div ref={historyPanelRef} style={floatStyles.container}>
-        <button
-          style={floatStyles.btn}
-          title="创建分支会话"
-          onClick={() => onCreateBranch?.()}
-        >
-          <PlusIcon />
-        </button>
-        <button
-          style={{ ...floatStyles.btn, ...(showHistory ? floatStyles.btnActive : {}) }}
-          title="分支历史"
-          onClick={() => setShowHistory(p => !p)}
-        >
-          <HistoryIcon />
-        </button>
+      {/* 聊天顶部操作栏（独立行，不遮挡消息） */}
+      <div style={styles.chatHeader}>
+        <div ref={historyPanelRef} style={styles.chatHeaderActions}>
+          <button
+            style={floatStyles.btn}
+            title="创建分支会话"
+            onClick={() => onCreateBranch?.()}
+          >
+            <PlusIcon />
+          </button>
+          <button
+            style={{ ...floatStyles.btn, ...(showHistory ? floatStyles.btnActive : {}) }}
+            title="分支历史"
+            onClick={() => setShowHistory(p => !p)}
+          >
+            <HistoryIcon />
+          </button>
 
-        {showHistory && (
-          <div style={floatStyles.panel}>
-            <div style={floatStyles.panelHeader}>分支历史</div>
-            <div style={floatStyles.list}>
-              {(branchConversations ?? []).map(conv => {
-                const isCurrent = conv.id === conversation.id
-                return (
-                  <button
-                    key={conv.id}
-                    style={{ ...floatStyles.item, ...(isCurrent ? floatStyles.itemActive : {}) }}
-                    onClick={() => { onSelectConversation?.(conv.id); setShowHistory(false) }}
-                  >
-                    <span style={floatStyles.itemTitle}>{conv.title}</span>
-                    <span style={floatStyles.itemMeta}>
-                      {isCurrent ? 'Current Chat' : formatRelativeTime(conv.createdAt)}
-                    </span>
-                  </button>
-                )
-              })}
-              {(!branchConversations || branchConversations.length === 0) && (
-                <div style={floatStyles.empty}>暂无历史记录</div>
-              )}
+          {showHistory && (
+            <div style={floatStyles.panel}>
+              <div style={floatStyles.panelHeader}>分支历史</div>
+              <div style={floatStyles.list}>
+                {(branchConversations ?? []).map(conv => {
+                  const isCurrent = conv.id === conversation.id
+                  return (
+                    <button
+                      key={conv.id}
+                      style={{ ...floatStyles.item, ...(isCurrent ? floatStyles.itemActive : {}) }}
+                      onClick={() => { onSelectConversation?.(conv.id); setShowHistory(false) }}
+                    >
+                      <span style={floatStyles.itemTitle}>{conv.title}</span>
+                      <span style={floatStyles.itemMeta}>
+                        {isCurrent ? 'Current Chat' : formatRelativeTime(conv.createdAt)}
+                      </span>
+                    </button>
+                  )
+                })}
+                {(!branchConversations || branchConversations.length === 0) && (
+                  <div style={floatStyles.empty}>暂无历史记录</div>
+                )}
+              </div>
+              <div style={floatStyles.panelDivider} />
+              <button
+                style={floatStyles.createBtn}
+                onClick={() => { onCreateBranch?.(); setShowHistory(false) }}
+              >
+                <PlusIcon size={12} />
+                <span>创建分支会话</span>
+              </button>
             </div>
-            <div style={floatStyles.panelDivider} />
-            <button
-              style={floatStyles.createBtn}
-              onClick={() => { onCreateBranch?.(); setShowHistory(false) }}
-            >
-              <PlusIcon size={12} />
-              <span>创建分支会话</span>
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div style={styles.messages}>
@@ -471,8 +473,22 @@ function MiniChevron({ open }: { open: boolean }) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden', position: 'relative' },
-  messages: { flex: 1, overflowY: 'auto', padding: '24px 0 8px' },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', overflow: 'hidden' },
+  // 聊天顶部栏：容纳分支/历史按钮，独立于消息滚动区
+  chatHeader: {
+    flexShrink: 0,
+    height: 44,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: '0 16px',
+  },
+  chatHeaderActions: {
+    position: 'relative',
+    display: 'flex',
+    gap: 6,
+  },
+  messages: { flex: 1, overflowY: 'auto', padding: '8px 0 8px' },
   statusRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 40px', color: 'var(--text-tertiary)' },
   statusRowText: { fontSize: 12 },
   inputArea: { padding: '8px 20px 16px' },
@@ -609,14 +625,6 @@ const mdStyles: Record<string, React.CSSProperties> = {
 }
 
 const floatStyles: Record<string, React.CSSProperties> = {
-  container: {
-    position: 'absolute',
-    top: 12,
-    right: 16,
-    display: 'flex',
-    gap: 6,
-    zIndex: 10,
-  },
   btn: {
     width: 32,
     height: 32,
