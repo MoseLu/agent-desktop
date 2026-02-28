@@ -425,10 +425,15 @@ function AppContent() {
       createdAt: new Date(),
       parentId: fromConversationId,
       smartMode: fromConv.smartMode,
+      mode: fromConv.mode,  // 继承根会话的 mode
     }
     setConversations(prev => [...prev, branchConv])
     setActiveId(id)
     setPage('chat')
+    // 立即持久化分支
+    if (isElectron()) {
+      window.electron.convSave(serializeConv(branchConv)).catch(console.error)
+    }
   }, [conversations])
 
   // 切换到某个子会话（不修改全局 tab，只改 activeId）
@@ -438,13 +443,21 @@ function AppContent() {
   }, [])
 
   const deleteConv = (id: string) => {
-    setConversations(prev => prev.filter(c => c.id !== id))
-    if (activeId === id) {
+    // 递归收集该会话及其所有子分支的 ID
+    const collectTree = (rootId: string, all: Conversation[]): string[] => {
+      const ids = [rootId]
+      all.filter(c => c.parentId === rootId).forEach(c => ids.push(...collectTree(c.id, all)))
+      return ids
+    }
+    const toDelete = collectTree(id, conversations)
+
+    setConversations(prev => prev.filter(c => !toDelete.includes(c.id)))
+    if (activeId && toDelete.includes(activeId)) {
       setActiveId(null)
       setPage('home')
     }
     if (isElectron()) {
-      window.electron.convDelete(id).catch(console.error)
+      toDelete.forEach(delId => window.electron.convDelete(delId).catch(console.error))
     }
   }
 

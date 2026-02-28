@@ -8,9 +8,10 @@ import { Dropdown, type MenuProps, message } from 'antd'
 interface TaskItemWithMenuProps extends TaskItemProps {
   onRename: (id: string, newTitle: string) => void
   onCopyId: (id: string) => void
+  branchCount: number
 }
 
-function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHoverChange, onRename, onCopyId }: TaskItemWithMenuProps) {
+function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHoverChange, onRename, onCopyId, branchCount }: TaskItemWithMenuProps) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(conversation.title)
   const [menuBtnHovered, setMenuBtnHovered] = useState(false)
@@ -129,6 +130,22 @@ function TaskItem({ conversation, isActive, isHovered, onSelect, onDelete, onHov
           {conversation.title}
         </span>
       )}
+      {/* 分支数量徽标 — 有分支时常驻显示，hover 时隐藏（让出位置给菜单按钮） */}
+      {branchCount > 0 && !isHovered && (
+        <span style={{
+          fontSize: 10,
+          color: 'var(--text-tertiary)',
+          background: 'var(--bg-tertiary)',
+          border: '1px solid var(--border-light)',
+          borderRadius: 8,
+          padding: '1px 5px',
+          flexShrink: 0,
+          lineHeight: '14px',
+          whiteSpace: 'nowrap',
+        }}>
+          {branchCount}分支
+        </span>
+      )}
       {/* 三点菜单按钮 - hover 时可见，始终占位防止文字抖动 */}
       <div
         style={{
@@ -189,6 +206,7 @@ interface SectionProps {
   conversations: TaskListProps['conversations']
   activeRootId: string | null
   hoverId: string | null
+  branchCountMap: Record<string, number>
   onHoverChange: (id: string | null) => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
@@ -196,7 +214,7 @@ interface SectionProps {
   onCopyId: (id: string) => void
 }
 
-function Section({ label, conversations, activeRootId, hoverId, onHoverChange, onSelect, onDelete, onRename, onCopyId }: SectionProps) {
+function Section({ label, conversations, activeRootId, hoverId, branchCountMap, onHoverChange, onSelect, onDelete, onRename, onCopyId }: SectionProps) {
   const [open, setOpen] = useState(true)
 
   if (conversations.length === 0) return null
@@ -215,6 +233,7 @@ function Section({ label, conversations, activeRootId, hoverId, onHoverChange, o
               conversation={conv}
               isActive={conv.id === activeRootId}
               isHovered={hoverId === conv.id}
+              branchCount={branchCountMap[conv.id] ?? 0}
               onSelect={() => onSelect(conv.id)}
               onDelete={() => onDelete(conv.id)}
               onHoverChange={hovered => onHoverChange(hovered ? conv.id : null)}
@@ -245,9 +264,20 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
     return current?.id ?? activeId
   }, [activeId, conversations])
 
-  // 按 mode 分组
+  // 按 mode 分组（只含根会话）
   const chatConvs = useMemo(() => rootConversations.filter(c => c.mode === 'chat'), [rootConversations])
   const codeConvs = useMemo(() => rootConversations.filter(c => c.mode !== 'chat'), [rootConversations])
+
+  // 每个根会话的直接子分支数量（基于完整 conversations 列表）
+  const branchCountMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    conversations.forEach(c => {
+      if (c.parentId) {
+        map[c.parentId] = (map[c.parentId] ?? 0) + 1
+      }
+    })
+    return map
+  }, [conversations])
 
   const handleCopyId = async (id: string) => {
     try {
@@ -267,6 +297,7 @@ export function TaskList({ conversations, activeId, isOpen, onSelect, onDelete, 
   const sectionProps = {
     activeRootId,
     hoverId,
+    branchCountMap,
     onHoverChange: setHoverId,
     onSelect,
     onDelete,
