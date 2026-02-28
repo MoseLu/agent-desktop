@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electron', {
   getProxyConfig: () => ipcRenderer.invoke('get-proxy-config'),
   saveProxyConfig: (p) => ipcRenderer.invoke('save-proxy-config', p),
   testProxyProvider: (p) => ipcRenderer.invoke('test-proxy-provider', p),
+  getAvailableModels: () => ipcRenderer.invoke('get-available-models'),
   // Agent Hub (多 Agent 支持)
   checkAvailableAgents: () => ipcRenderer.invoke('agent:check-available'),
   testAgent: (params) => ipcRenderer.invoke('agent:test', params),

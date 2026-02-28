@@ -250,33 +250,6 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
       case 'general':
         return (
           <div style={{ ...styles.tabContent, maxWidth: '100%' }}>
-            {/* 模型选择 */}
-            <Field label="模型" hint={'百炼 Coding Plan 的 API Key 和接入地址在"代理配置"中设置'}>
-              <select
-                style={styles.select}
-                value={form.model || 'qwen3.5-plus'}
-                onChange={e => set('model', e.target.value)}
-              >
-                <optgroup label="百炼 Coding Plan">
-                  <option value="qwen3.5-plus">Qwen3.5 Plus（推荐）</option>
-                  <option value="qwen3-coder-next">Qwen3 Coder Next（最新编程）</option>
-                  <option value="qwen-turbo">Qwen Turbo（快速）</option>
-                </optgroup>
-                <optgroup label="MiniMax">
-                  <option value="MiniMax-M2.5">MiniMax M2.5（推荐）</option>
-                  <option value="MiniMax-Text-01">MiniMax Text-01</option>
-                </optgroup>
-                <optgroup label="通义千问 Qwen">
-                  <option value="qwen-plus">Qwen Plus</option>
-                  <option value="qwen-max">Qwen Max</option>
-                </optgroup>
-                <optgroup label="Claude">
-                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                  <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
-                </optgroup>
-              </select>
-            </Field>
-
             <Field label="外观">
               <div style={styles.themeCards}>
                 {([

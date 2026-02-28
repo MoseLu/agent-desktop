@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import type { Settings, Conversation, Tab, AppMode } from '@types'
+import type { Settings, Conversation, Tab, AppMode, ModelOption } from '@types'
 import { ThemeProvider, useTheme } from '@contexts/ThemeProvider'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import Sidebar from '@layout'
@@ -27,6 +27,30 @@ function AppContent() {
 
   // 应用模式：chat（浏览器/桌面均支持）/ code（仅 Electron）
   const [mode, setMode] = useState<AppMode>('chat')
+
+  // 可用模型列表（由后端根据已配置 provider 动态返回，空数组时 ModelSelector 使用自身默认值）
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>([])
+
+  const fetchAvailableModels = useCallback(async () => {
+    if (!isElectron()) return
+    try {
+      const models = await window.electron.getAvailableModels()
+      if (models.length > 0) {
+        setAvailableModels(models)
+        // 若当前 model 不在可用列表中，切换到默认值
+        setSettings(prev => {
+          if (!prev) return prev
+          const isValid = models.some(m => m.value === prev.model)
+          if (isValid) return prev
+          const defaultModel = models[0].value
+          window.electron.saveSettings({ model: defaultModel })
+          return { ...prev, model: defaultModel }
+        })
+      }
+    } catch (err) {
+      console.error('Failed to fetch available models:', err)
+    }
+  }, [])
 
   useEffect(() => {
     // 使用环境变量检测并获取设置
@@ -98,6 +122,8 @@ function AppContent() {
           // 初始化主题
           setTheme(s.theme || 'system')
         }
+        // 加载设置后拉取可用模型列表
+        fetchAvailableModels()
       })
       .catch(err => {
         console.error('获取设置失败:', err)
@@ -379,7 +405,9 @@ function AppContent() {
               conversation={activeConv}
               settings={settings}
               mode={mode}
+              availableModels={availableModels}
               onUpdate={(updater) => updateConv(activeId!, updater)}
+              onSettingsChange={(s) => setSettings({ ...settings, ...s })}
               branchConversations={getBranchFamily(activeId!)}
               onCreateBranch={() => createBranch(activeId!)}
               onSwitchBranch={switchBranch}
@@ -387,6 +415,8 @@ function AppContent() {
           ) : (
             <HomePage
               settings={settings}
+              availableModels={availableModels}
+              onSettingsChange={(s) => setSettings({ ...settings, ...s })}
               onStartTask={(prompt, smartMode) => {
                 startNewTask(prompt, smartMode)
               }}
@@ -399,15 +429,14 @@ function AppContent() {
         <SettingsModal
           initial={settings}
           onSave={async (s) => {
-            // 设置已自动保存，这里只需要更新本地状态
-            // 如果是主题变化，先应用 DOM 再更新 React 状态，避免水合闪烁
-            if (s.theme) {
-              // ThemeProvider 的 setTheme 已经处理了 DOM 同步更新
-              setTheme(s.theme)
-            }
+            if (s.theme) setTheme(s.theme)
             setSettings({ ...settings, ...s })
           }}
-          onClose={() => setShowSettings(false)}
+          onClose={() => {
+            setShowSettings(false)
+            // 代理配置可能已变更，重新拉取可用模型
+            fetchAvailableModels()
+          }}
           onScheduledTasks={() => { setShowSettings(false); setPage('scheduled-tasks'); setActiveId(null) }}
         />
       )}

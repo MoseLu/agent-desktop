@@ -12,9 +12,18 @@ export interface ProxyProviderStatus {
 
 /** 全局代理配置状态 */
 export interface ProxyConfigStatus {
-  minimax?   : ProxyProviderStatus
-  qwen?      : ProxyProviderStatus
-  anthropic? : ProxyProviderStatus
+  minimax?    : ProxyProviderStatus
+  qwen?       : ProxyProviderStatus
+  qwenCoding? : ProxyProviderStatus
+  anthropic?  : ProxyProviderStatus
+}
+
+/** 可用模型条目（由后端根据已配置 provider 动态返回） */
+export interface ModelOption {
+  value: string
+  label: string
+  group: 'qwen-coding' | 'minimax' | 'qwen' | 'claude' | 'glm' | 'kimi'
+  description?: string
 }
 
 export interface Settings {
@@ -102,6 +111,7 @@ declare global {
       getProxyConfig: () => Promise<ProxyConfigStatus>
       saveProxyConfig: (p: { provider: string; apiKey?: string; baseUrl?: string }) => Promise<{ ok: boolean; error?: string }>
       testProxyProvider: (p: { provider: string }) => Promise<{ ok: boolean; content?: string; error?: string }>
+      getAvailableModels: () => Promise<ModelOption[]>
       // Agent Hub (多 Agent 支持)
       checkAvailableAgents: () => Promise<string[]>
       testAgent: (params: { model: string }) => Promise<{ success: boolean; content?: string; error?: string }>

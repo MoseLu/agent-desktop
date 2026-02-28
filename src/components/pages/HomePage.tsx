@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import type { Settings } from '@types'
+import type { Settings, ModelOption } from '@types'
 import IconButton from '@ui/IconButton'
 import ChatInput from '@ui/ChatInput'
 import ChatInputToolbar from '@ui/ChatInputToolbar'
@@ -24,6 +24,8 @@ import QuickChip from './HomePage/QuickChip'
 
 interface Props {
   settings: Settings
+  availableModels?: ModelOption[]
+  onSettingsChange?: (s: Partial<Settings>) => void
   onStartTask: (prompt?: string, smartMode?: boolean) => void
 }
 
@@ -115,7 +117,7 @@ const PLACEHOLDERS = [
   '我要给初中生做一个中世纪历史的 PPT，得让他们真的能听进去。要解释清楚、配图到位、举的例子能让他们产生共鸣，再加几道题检验下理解程度。',
 ]
 
-export default function HomePage({ settings, onStartTask }: Props) {
+export default function HomePage({ settings, availableModels, onSettingsChange, onStartTask }: Props) {
   const [input, setInput] = useState('')
   const [isSmartMode, setIsSmartMode] = useState(false)
   const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0)
@@ -359,8 +361,10 @@ export default function HomePage({ settings, onStartTask }: Props) {
                   {/* 模型切换器 */}
                   <ModelSelector
                     value={settings.model || 'qwen3.5-plus'}
+                    options={availableModels && availableModels.length > 0 ? availableModels : undefined}
                     onChange={(newModel) => {
-                      window.electron.saveSettings({ model: newModel })
+                      if (isElectron()) window.electron.saveSettings({ model: newModel })
+                      onSettingsChange?.({ model: newModel })
                       message.success(`已切换到 ${newModel}`, 1500)
                     }}
                   />

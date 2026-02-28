@@ -395,3 +395,52 @@ ipcMain.handle('chat-message', async (_, { model, messages }) => {
     return { ok: false, error: err.message }
   }
 })
+
+// ─── Available Models ───────────────────────────────────────────────────────
+// 根据已配置的 provider 返回可用模型列表（优雅降级：未配置的 provider 不展示）
+ipcMain.handle('get-available-models', () => {
+  if (!proxyConfig) return []
+
+  const status = proxyConfig.getStatus()
+  const models = []
+
+  // 百炼 Coding Plan (qwenCoding) — 统一接入多家模型
+  if (status.qwenCoding?.configured) {
+    models.push(
+      { value: 'qwen3.5-plus',        label: 'Qwen3.5 Plus',     group: 'qwen-coding', description: '推荐' },
+      { value: 'qwen3-coder-next',     label: 'Qwen3 Coder Next', group: 'qwen-coding', description: '最新编程' },
+      { value: 'qwen3-coder-plus',     label: 'Qwen3 Coder Plus', group: 'qwen-coding' },
+      { value: 'qwen3-max-2026-01-23', label: 'Qwen3 Max',        group: 'qwen-coding' },
+      { value: 'MiniMax-M2.5',         label: 'MiniMax M2.5',     group: 'minimax',     description: '推荐' },
+      { value: 'glm-5',               label: 'GLM-5',            group: 'glm' },
+      { value: 'glm-4.7',             label: 'GLM-4.7',          group: 'glm' },
+      { value: 'kimi-k2.5',           label: 'Kimi K2.5',        group: 'kimi' },
+    )
+  }
+
+  // MiniMax 独立 provider
+  if (status.minimax?.configured) {
+    if (!models.find(m => m.value === 'MiniMax-M2.5')) {
+      models.push({ value: 'MiniMax-M2.5',    label: 'MiniMax M2.5',    group: 'minimax', description: '推荐' })
+    }
+    models.push(  { value: 'MiniMax-Text-01', label: 'MiniMax Text-01', group: 'minimax' })
+  }
+
+  // 通义千问 Qwen 独立 provider
+  if (status.qwen?.configured) {
+    models.push(
+      { value: 'qwen-plus', label: 'Qwen Plus', group: 'qwen' },
+      { value: 'qwen-max',  label: 'Qwen Max',  group: 'qwen' },
+    )
+  }
+
+  // Anthropic Claude
+  if (status.anthropic?.configured) {
+    models.push(
+      { value: 'claude-sonnet-4-20250514',  label: 'Claude Sonnet 4',  group: 'claude' },
+      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', group: 'claude' },
+    )
+  }
+
+  return models
+})

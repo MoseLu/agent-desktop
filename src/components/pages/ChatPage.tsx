@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import type { Settings, Conversation, Message, AgentEvent, ToolEvent, AppMode } from '@types'
+import type { Settings, Conversation, Message, AgentEvent, ToolEvent, AppMode, ModelOption } from '@types'
 import IconButton from '@ui/IconButton'
 import Tooltip from '@ui/Tooltip'
 import ChatInput from '@ui/ChatInput'
@@ -33,13 +33,15 @@ interface Props {
   conversation: Conversation
   settings: Settings
   mode: AppMode
+  availableModels?: ModelOption[]
   onUpdate: (updater: (c: Conversation) => Partial<Conversation>) => void
+  onSettingsChange?: (s: Partial<Settings>) => void
   branchConversations?: Conversation[]
   onCreateBranch?: () => void
   onSwitchBranch?: (id: string) => void
 }
 
-export default function ChatPage({ conversation, settings, mode, onUpdate, branchConversations, onCreateBranch, onSwitchBranch }: Props) {
+export default function ChatPage({ conversation, settings, mode, availableModels, onUpdate, onSettingsChange, branchConversations, onCreateBranch, onSwitchBranch }: Props) {
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
@@ -337,8 +339,10 @@ export default function ChatPage({ conversation, settings, mode, onUpdate, branc
                   {/* 模型切换器 */}
                   <ModelSelector
                     value={settings.model || 'qwen3.5-plus'}
+                    options={availableModels && availableModels.length > 0 ? availableModels : undefined}
                     onChange={(newModel) => {
-                      window.electron.saveSettings({ model: newModel })
+                      if (isElectron()) window.electron.saveSettings({ model: newModel })
+                      onSettingsChange?.({ model: newModel })
                       message.success(`已切换到 ${newModel}`, 1500)
                     }}
                   />

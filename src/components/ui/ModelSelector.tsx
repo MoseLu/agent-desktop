@@ -1,12 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import Tooltip from './Tooltip'
+import type { ModelOption } from '@types'
 
-export interface ModelOption {
-  value: string
-  label: string
-  group: 'minimax' | 'qwen' | 'qwen-coding' | 'claude'
-  description?: string
-}
+export type { ModelOption }
 
 export interface ModelSelectorProps {
   value: string
@@ -16,17 +11,23 @@ export interface ModelSelectorProps {
 
 const DEFAULT_MODEL_OPTIONS: ModelOption[] = [
   // 百炼 Coding Plan
-  { value: 'qwen3.5-plus', label: 'Qwen3.5 Plus', group: 'qwen-coding', description: '推荐' },
-  { value: 'qwen3-coder-next', label: 'Qwen3 Coder Next', group: 'qwen-coding', description: '最新编程' },
-  { value: 'qwen-turbo', label: 'Qwen Turbo', group: 'qwen-coding', description: '快速' },
+  { value: 'qwen3.5-plus',        label: 'Qwen3.5 Plus',     group: 'qwen-coding', description: '推荐' },
+  { value: 'qwen3-coder-next',     label: 'Qwen3 Coder Next', group: 'qwen-coding', description: '最新编程' },
+  { value: 'qwen3-coder-plus',     label: 'Qwen3 Coder Plus', group: 'qwen-coding' },
+  { value: 'qwen3-max-2026-01-23', label: 'Qwen3 Max',        group: 'qwen-coding' },
   // MiniMax
-  { value: 'MiniMax-M2.5', label: 'MiniMax M2.5', group: 'minimax', description: '推荐' },
+  { value: 'MiniMax-M2.5',    label: 'MiniMax M2.5',    group: 'minimax', description: '推荐' },
   { value: 'MiniMax-Text-01', label: 'MiniMax Text-01', group: 'minimax' },
   // 通义千问 Qwen
   { value: 'qwen-plus', label: 'Qwen Plus', group: 'qwen' },
-  { value: 'qwen-max', label: 'Qwen Max', group: 'qwen' },
+  { value: 'qwen-max',  label: 'Qwen Max',  group: 'qwen' },
+  // GLM
+  { value: 'glm-5',  label: 'GLM-5',  group: 'glm' },
+  { value: 'glm-4.7', label: 'GLM-4.7', group: 'glm' },
+  // Kimi
+  { value: 'kimi-k2.5', label: 'Kimi K2.5', group: 'kimi' },
   // Claude
-  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', group: 'claude' },
+  { value: 'claude-sonnet-4-20250514',  label: 'Claude Sonnet 4',  group: 'claude' },
   { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', group: 'claude' },
 ]
 
@@ -35,6 +36,8 @@ const GROUP_LABELS: Record<string, string> = {
   'minimax': 'MiniMax',
   'qwen': '通义千问 Qwen',
   'claude': 'Claude',
+  'glm': '智谱 GLM',
+  'kimi': 'Kimi',
 }
 
 const GROUP_COLORS: Record<string, string> = {
@@ -42,11 +45,13 @@ const GROUP_COLORS: Record<string, string> = {
   'minimax': '#f59e0b',
   'qwen': '#10b981',
   'claude': '#ec4899',
+  'glm': '#6d28d9',
+  'kimi': '#0ea5e9',
 }
 
 export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL_OPTIONS }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [selectedGroup, setSelectedGroup] = useState<'all' | 'minimax' | 'qwen' | 'qwen-coding'>('all')
+  const [selectedGroup, setSelectedGroup] = useState<string>('all')
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 点击外部关闭下拉框
@@ -56,7 +61,6 @@ export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL
         setIsOpen(false)
       }
     }
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -66,16 +70,28 @@ export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL
   // 当前选中的模型
   const currentModel = options.find(m => m.value === value) || options[0]
 
+  // 动态计算存在的组别，用于筛选标签
+  const availableGroups = Array.from(new Set(options.map(m => m.group)))
+  const filterTabs = [
+    { key: 'all', label: '全部' },
+    ...availableGroups.map(g => ({ key: g, label: GROUP_LABELS[g] ?? g })),
+  ]
+
+  // 如果当前选中的 group 在新 options 中不存在，重置到 all
+  useEffect(() => {
+    if (selectedGroup !== 'all' && !availableGroups.includes(selectedGroup as ModelOption['group'])) {
+      setSelectedGroup('all')
+    }
+  }, [options]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // 按组过滤模型
-  const filteredOptions = selectedGroup === 'all' 
-    ? options 
+  const filteredOptions = selectedGroup === 'all'
+    ? options
     : options.filter(m => m.group === selectedGroup)
 
   // 按组分组显示
   const groupedOptions = filteredOptions.reduce((acc, model) => {
-    if (!acc[model.group]) {
-      acc[model.group] = []
-    }
+    if (!acc[model.group]) acc[model.group] = []
     acc[model.group].push(model)
     return acc
   }, {} as Record<string, ModelOption[]>)
@@ -100,34 +116,31 @@ export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL
       {/* 下拉面板 */}
       {isOpen && (
         <div style={styles.dropdownPanel}>
-          {/* 组别筛选 */}
-          <div style={styles.groupFilter}>
-            {[
-              { key: 'all', label: '全部' },
-              { key: 'qwen-coding', label: '百炼 Coding Plan' },
-              { key: 'minimax', label: 'MiniMax' },
-              { key: 'qwen', label: 'Qwen' },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                style={{
-                  ...styles.groupFilterBtn,
-                  ...(selectedGroup === key ? styles.groupFilterBtnActive : {}),
-                }}
-                onClick={() => setSelectedGroup(key as any)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* 组别筛选（仅当有多于一组时显示） */}
+          {filterTabs.length > 2 && (
+            <div style={styles.groupFilter}>
+              {filterTabs.map(({ key, label }) => (
+                <button
+                  key={key}
+                  style={{
+                    ...styles.groupFilterBtn,
+                    ...(selectedGroup === key ? styles.groupFilterBtnActive : {}),
+                  }}
+                  onClick={() => setSelectedGroup(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* 模型列表 */}
           <div style={styles.modelList}>
             {Object.entries(groupedOptions).map(([group, models]) => (
               <div key={group} style={styles.modelGroup}>
                 <div style={styles.modelGroupHeader}>
-                  <span style={styles.modelGroupLabel}>{GROUP_LABELS[group]}</span>
-                  <span style={{ ...styles.modelGroupDot, background: GROUP_COLORS[group] }} />
+                  <span style={styles.modelGroupLabel}>{GROUP_LABELS[group] ?? group}</span>
+                  <span style={{ ...styles.modelGroupDot, background: GROUP_COLORS[group] ?? '#888' }} />
                 </div>
                 {models.map(model => (
                   <button
@@ -191,7 +204,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: 0,
     bottom: 'calc(100% + 8px)',
     width: 320,
-    maxHeight: 420,
+    maxHeight: 440,
     background: 'var(--bg-primary)',
     borderRadius: 12,
     boxShadow: 'var(--shadow-lg)',
@@ -203,21 +216,22 @@ const styles: Record<string, React.CSSProperties> = {
   },
   groupFilter: {
     display: 'flex',
+    flexWrap: 'wrap',
     gap: 4,
     padding: 8,
     borderBottom: '1px solid var(--border-light)',
   },
   groupFilterBtn: {
-    flex: 1,
-    padding: '6px 8px',
+    padding: '5px 8px',
     borderRadius: 6,
     border: 'none',
     background: 'transparent',
-    fontSize: 12,
+    fontSize: 11,
     color: 'var(--text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s',
     fontWeight: 500,
+    whiteSpace: 'nowrap',
   },
   groupFilterBtnActive: {
     background: 'var(--bg-secondary)',
