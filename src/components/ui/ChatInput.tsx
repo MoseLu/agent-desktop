@@ -56,6 +56,13 @@ export default function ChatInput({
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Tab 键直接传递回调，不阻止默认行为
+    if (e.key === 'Tab') {
+      if (onKeyDown) {
+        onKeyDown(e)
+      }
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey && !disabled) {
       e.preventDefault()
       const trimmed = value.trim()
@@ -106,7 +113,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     background: 'var(--input-bg)',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
     boxSizing: 'border-box',
   },
   inputContent: {

@@ -29,8 +29,10 @@ function isClaude(model: string) {
 
 /** 检测是否在真实 Electron 环境（非 browser mock） */
 function isRealElectron(): boolean {
-  const el = (window as any).electron
-  return !!(el && !el.__isMock)
+  // 暂时禁用 IPC 模式，统一使用独立的代理服务器 (127.0.0.1:4575)
+  return false
+  // const el = (window as any).electron
+  // return !!(el && !el.__isMock)
 }
 
 /**
@@ -55,13 +57,17 @@ export async function sendChatMessage(
   }
 
   // ── 浏览器 / Electron dev：走 Vite proxy（临时调试方案）────────────────────
-  return callViaBrowserProxy(_apiKey, model, messages)
+  // 浏览器模式下从 localStorage 获取 API Key
+  const apiKey = _apiKey || localStorage.getItem('browser-api-key') || ''
+  return callViaBrowserProxy(apiKey, model, messages)
 }
 
 // ── IPC 代理调用（Electron 生产模式）──────────────────────────────────────────
 
 async function callViaIpc(model: string, messages: ChatMessage[]): Promise<string> {
+  console.log('[ChatAPI] callViaIpc:', { model })
   const result = await (window as any).electron.chatMessage({ model, messages })
+  console.log('[ChatAPI] IPC result:', result)
 
   if (!result.ok) {
     throw new Error(
@@ -75,47 +81,42 @@ async function callViaIpc(model: string, messages: ChatMessage[]): Promise<strin
   return choice?.message?.content ?? ''
 }
 
-// ── 浏览器代理调用（开发调试，Vite proxy 转发） ───────────────────────────────
+// ── 浏览器代理调用（调用本地后端代理服务器） ───────────────────────────────
 
 async function callViaBrowserProxy(
-  apiKey: string,
+  _apiKey: string,
   model: string,
   messages: ChatMessage[]
 ): Promise<string> {
-  let url: string
-  let headers: Record<string, string>
+  console.log('[ChatAPI] callViaBrowserProxy:', { model })
 
-  if (isMiniMax(model)) {
-    url = '/api-proxy/minimax/v1/text/chatcompletion_v2'
-    headers = {
-      'Content-Type'  : 'application/json',
-      'Authorization' : `Bearer ${apiKey}`,
+  // 浏览器模式下调用本地后端代理服务器
+  const backendUrl = 'http://127.0.0.1:4575/v1/chat/completions'
+
+  console.log('[ChatAPI] Fetching:', backendUrl)
+
+  try {
+    const res = await fetch(backendUrl, {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({
+        model,
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        max_tokens: 8096,
+      }),
+    })
+
+    console.log('[ChatAPI] Response:', res.status, res.statusText)
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as any
+      throw new Error(`API 错误 (${res.status}): ${err.error?.message ?? res.statusText}`)
     }
-  } else if (isQwen(model)) {
-    url = '/api-proxy/qwen/compatible-mode/v1/chat/completions'
-    headers = {
-      'Content-Type'  : 'application/json',
-      'Authorization' : `Bearer ${apiKey}`,
-    }
-  } else {
-    throw new Error('Claude 模型在 Web 端需要后端代理服务器，请在 Electron 桌面版中使用。')
+
+    const data = await res.json() as any
+    return data.choices?.[0]?.message?.content ?? ''
+  } catch (err) {
+    console.error('[ChatAPI] Fetch error:', err)
+    throw new Error(`无法连接到后端代理服务器 (${backendUrl})。请确保后端服务正在运行。`)
   }
-
-  const res = await fetch(url, {
-    method  : 'POST',
-    headers,
-    body    : JSON.stringify({
-      model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      max_tokens: 8096,
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as any
-    throw new Error(`API 错误 (${res.status}): ${err.error?.message ?? res.statusText}`)
-  }
-
-  const data = await res.json() as any
-  return data.choices?.[0]?.message?.content ?? ''
 }

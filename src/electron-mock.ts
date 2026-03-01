@@ -61,14 +61,30 @@ interface ElectronAPI {
   saveSettings: (s: Partial<Settings>) => Promise<{ ok: boolean }>;
   pickFolder: () => Promise<string | null>;
   agentRun: (p: { messages: Pick<Message, 'role' | 'content'>[]; workspace: string }) => Promise<{ result?: unknown; error?: string }>;
+  chatMessage: (p: { model: string; messages: { role: string; content: string }[] }) => Promise<{ ok: boolean; status?: number; data?: any; error?: string }>;
   agentStop: () => Promise<{ ok: boolean }>;
   onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void;
   fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>;
   openInExplorer: (p: string) => void;
   openExternal: (url: string) => Promise<void>;
+  setAutoLaunch: (enabled: boolean) => Promise<{ ok: boolean }>;
+  getAutoLaunch: () => Promise<{ openAtLogin: boolean }>;
+  getProxyPort: () => Promise<number>;
+  getProxyConfig: () => Promise<any>;
+  saveProxyConfig: (p: any) => Promise<{ ok: boolean; error?: string }>;
+  testProxyProvider: (p: any) => Promise<{ ok: boolean; content?: string; error?: string }>;
+  getAvailableModels: () => Promise<any[]>;
+  checkAvailableAgents: () => Promise<string[]>;
+  testAgent: (params: any) => Promise<{ success: boolean; content?: string; error?: string }>;
+  selectBestAgent: () => Promise<{ success: boolean; agent?: string; error?: string }>;
   authCheck: () => Promise<{ userName: string | null }>;
   authLogin: (userName: string) => Promise<{ ok: boolean }>;
   authLogout: () => Promise<{ ok: boolean }>;
+  getAccounts: () => Promise<any[]>;
+  createAccount: (userName: string, userAvatar?: string) => Promise<{ ok: boolean; error?: string; account?: any }>;
+  getAccountInfo: (userName: string) => Promise<any | null>;
+  deleteAccount: (userName: string) => Promise<{ ok: boolean; error?: string }>;
+  updateAvatar: (userName: string, userAvatar: string) => Promise<{ ok: boolean; error?: string }>;
   convList: () => Promise<StoredConversation[]>;
   convSave: (conv: StoredConversation) => Promise<{ ok: boolean }>;
   convDelete: (id: string) => Promise<{ ok: boolean }>;
@@ -145,6 +161,13 @@ const createMockElectron = (): ElectronAPI => {
       return { error: errMsg }
     },
 
+    // Chat 模式 IPC 调用（浏览器模式下通过 chatApi.ts 走 proxy）
+    chatMessage: async ({ model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
+      // 浏览器模式下，chatMessage 应该走 callViaBrowserProxy，而不是这里
+      // 这里返回错误，让 chatApi.ts 处理
+      return { ok: false, error: '请使用浏览器代理路径' }
+    },
+
     agentStop: async () => {
       stopRequested = true
       emitAgentEvent({ type: 'stopped' })
@@ -173,6 +196,53 @@ const createMockElectron = (): ElectronAPI => {
 
     openExternal: async (url: string) => {
       window.open(url, '_blank')
+    },
+
+    // Auto launch
+    setAutoLaunch: async (enabled: boolean) => {
+      return { ok: true }
+    },
+    getAutoLaunch: async () => {
+      return { openAtLogin: false }
+    },
+
+    // Proxy
+    getProxyPort: async () => {
+      return 8080
+    },
+    getProxyConfig: async () => {
+      return { provider: '', apiKey: '' }
+    },
+    saveProxyConfig: async (p: any) => {
+      return { ok: true }
+    },
+    testProxyProvider: async (p: any) => {
+      return { ok: true, content: 'Mock OK' }
+    },
+
+    // Models & Agents
+    getAvailableModels: async () => {
+      return [
+        // 推荐模型
+        { value: 'qwen3.5-plus', label: 'Qwen3.5 Plus', group: '百炼 Coding Plan', description: '支持图片理解' },
+        { value: 'kimi-k2.5', label: 'Kimi K2.5', group: 'Kimi', description: '支持图片理解' },
+        { value: 'glm-5', label: 'GLM-5', group: '智谱 GLM' },
+        { value: 'MiniMax-M2.5', label: 'MiniMax M2.5', group: 'MiniMax Coding Plan' },
+        // 更多模型
+        { value: 'qwen3-max-2026-01-23', label: 'Qwen3 Max', group: '百炼 Coding Plan' },
+        { value: 'qwen3-coder-next', label: 'Qwen3 Coder Next', group: '百炼 Coding Plan' },
+        { value: 'qwen3-coder-plus', label: 'Qwen3 Coder Plus', group: '百炼 Coding Plan' },
+        { value: 'glm-4.7', label: 'GLM-4.7', group: '智谱 GLM' },
+      ]
+    },
+    checkAvailableAgents: async () => {
+      return []
+    },
+    testAgent: async (params: any) => {
+      return { success: true, content: 'Mock OK' }
+    },
+    selectBestAgent: async () => {
+      return { success: true, agent: 'default' }
     },
 
     authCheck: async () => {

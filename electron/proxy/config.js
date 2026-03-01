@@ -24,6 +24,13 @@ const DEFAULT_BASE_URLS = {
   anthropic : 'https://api.anthropic.com',
 }
 
+const ENV_KEYS = {
+  minimax   : 'MINIMAX_API_KEY',
+  qwen      : 'QWEN_API_KEY',
+  qwenCoding: 'QWEN_CODING_API_KEY',
+  anthropic : 'ANTHROPIC_API_KEY',
+}
+
 class ProxyConfig {
   constructor(store) {
     this.store = store
@@ -37,7 +44,10 @@ class ProxyConfig {
   getAll() {
     const result = {}
     for (const [provider, keys] of Object.entries(STORE_KEYS)) {
-      const apiKey = this.store.get(keys.apiKey, '')
+      let apiKey = this.store.get(keys.apiKey, '')
+      if (!apiKey && ENV_KEYS[provider]) {
+        apiKey = process.env[ENV_KEYS[provider]] || ''
+      }
       if (apiKey) {
         result[provider] = {
           apiKey,
@@ -54,7 +64,10 @@ class ProxyConfig {
   get(provider) {
     const keys   = STORE_KEYS[provider]
     if (!keys) return null
-    const apiKey = this.store.get(keys.apiKey, '')
+    let apiKey = this.store.get(keys.apiKey, '')
+    if (!apiKey && ENV_KEYS[provider]) {
+      apiKey = process.env[ENV_KEYS[provider]] || ''
+    }
     if (!apiKey) return null
     return {
       apiKey,

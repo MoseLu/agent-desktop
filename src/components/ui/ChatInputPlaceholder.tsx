@@ -6,6 +6,7 @@ export interface ChatInputPlaceholderProps {
   showTabBadge?: boolean
   style?: React.CSSProperties
   animationKey?: string | number
+  loading?: boolean
 }
 
 export default function ChatInputPlaceholder({
@@ -14,14 +15,15 @@ export default function ChatInputPlaceholder({
   showTabBadge = false,
   style,
   animationKey,
+  loading = false,
 }: ChatInputPlaceholderProps) {
   if (value) return null
 
   return (
     <div key={animationKey} style={{ ...styles.placeholderWrapper, ...style }}>
       <span style={styles.placeholderText}>
-        {placeholder}
-        {showTabBadge && (
+        {loading ? 'AI 补全中...' : placeholder}
+        {showTabBadge && !loading && (
           <>
             {' '}
             <span

@@ -1,9 +1,33 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Menu } = require('electron')
 const path = require('path')
+const fs = require('fs')
 const AgentService = require('./agent/service')
 const { AgentHub } = require('./agent/agent-hub')
 const ProxyServer = require('./proxy/server')
 const ProxyConfig = require('./proxy/config')
+
+// 加载 .env 文件（Node.js 原生方式，不依赖 dotenv 包）
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '..', '.env')
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8')
+    envContent.split('\n').forEach(line => {
+      const trimmed = line.trim()
+      if (trimmed && !trimmed.startsWith('#')) {
+        const eqIdx = trimmed.indexOf('=')
+        if (eqIdx > 0) {
+          const key = trimmed.slice(0, eqIdx).trim()
+          const value = trimmed.slice(eqIdx + 1).trim()
+          if (!process.env[key]) {
+            process.env[key] = value
+          }
+        }
+      }
+    })
+    console.log('[Main] 已加载 .env 文件')
+  }
+}
+loadEnvFile()
 
 // electron-store 是 ESM 模块，需要动态导入
 let Store
@@ -517,13 +541,11 @@ ipcMain.handle('test-proxy-provider', async (_, { provider }) => {
   }
 })
 
-// ─── Chat Message Proxy (主进程通过代理服务器转发，无需渲染进程持有 apiKey) ────
+// ─── Chat Message Proxy (主进程通过独立代理服务器转发，无需渲染进程持有 apiKey) ────
 ipcMain.handle('chat-message', async (_, { model, messages }) => {
   try {
-    const port = proxyServer?.port
-    if (!port) return { ok: false, error: '代理服务器未启动' }
-
-    const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
+    // 使用独立代理服务 4575 端口
+    const res = await fetch('http://127.0.0.1:4575/v1/chat/completions', {
       method  : 'POST',
       headers : { 'Content-Type': 'application/json' },
       body    : JSON.stringify({ model, messages, max_tokens: 8096 }),

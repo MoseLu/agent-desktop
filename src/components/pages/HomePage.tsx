@@ -7,6 +7,7 @@ import ChatInputPlaceholder from '@ui/ChatInputPlaceholder'
 import Tooltip from '@ui/Tooltip'
 import ModelSelector from '@ui/ModelSelector'
 import { isElectron } from '@utils/env'
+import { sendChatMessage } from '@utils/chatApi'
 import { message } from '@ui/Message'
 import {
   AttachIcon,
@@ -125,6 +126,7 @@ export default function HomePage({ settings, availableModels, onSettingsChange, 
   const [isSelectingFolder, setIsSelectingFolder] = useState(false)
   const [isHoveringWorkspace, setIsHoveringWorkspace] = useState(false)
   const [workspace, setWorkspace] = useState(settings.workspace || '未设置工作目录')
+  const [isCompleting, setIsCompleting] = useState(false) // AI 补全加载状态
   const workspaceBtnRef = useRef<HTMLDivElement>(null)
   const efficientModeBtnRef = useRef<HTMLButtonElement>(null)
   const omnipotentModeBtnRef = useRef<HTMLButtonElement>(null)
@@ -160,17 +162,21 @@ export default function HomePage({ settings, availableModels, onSettingsChange, 
     onStartTask(val, isSmartMode)
   }
 
-  const handleTabClick = () => {
-    setInput(currentPlaceholder)
-  }
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Tab' && !input) {
+    if (e.key === 'Tab') {
       e.preventDefault()
       handleTabClick()
     }
   }
 
+  // Tab 填充预设（不发送，由用户手动点击发送）
+  const handleTabClick = () => {
+    if (!input) {
+      // 空输入时只填充预设，不自动发送
+      setInput(currentPlaceholder)
+    }
+    // 用户需要手动点击发送按钮才会发送
+  }
   const handleSelectWorkspace = async () => {
     if (isSelectingFolder) return
     setIsSelectingFolder(true)
@@ -320,6 +326,7 @@ export default function HomePage({ settings, availableModels, onSettingsChange, 
                 value={input}
                 placeholder={currentPlaceholder}
                 showTabBadge
+                loading={isCompleting}
               />
             </>
           )}

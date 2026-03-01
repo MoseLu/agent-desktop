@@ -10,43 +10,30 @@ export interface ModelSelectorProps {
 }
 
 const DEFAULT_MODEL_OPTIONS: ModelOption[] = [
-  // 百炼 Coding Plan
-  { value: 'qwen3.5-plus',        label: 'Qwen3.5 Plus',     group: 'qwen-coding', description: '推荐' },
-  { value: 'qwen3-coder-next',     label: 'Qwen3 Coder Next', group: 'qwen-coding', description: '最新编程' },
-  { value: 'qwen3-coder-plus',     label: 'Qwen3 Coder Plus', group: 'qwen-coding' },
+  // 推荐模型
+  { value: 'qwen3.5-plus',        label: 'Qwen3.5 Plus',     group: 'qwen-coding', description: '推荐，支持图片理解' },
+  { value: 'kimi-k2.5',           label: 'Kimi K2.5',         group: 'kimi',        description: '支持图片理解' },
+  { value: 'glm-5',               label: 'GLM-5',              group: 'glm' },
+  { value: 'MiniMax-M2.5',        label: 'MiniMax M2.5',      group: 'minimax',    description: '推荐' },
+  // 更多模型
   { value: 'qwen3-max-2026-01-23', label: 'Qwen3 Max',        group: 'qwen-coding' },
-  // MiniMax
-  { value: 'MiniMax-M2.5',    label: 'MiniMax M2.5',    group: 'minimax', description: '推荐' },
-  { value: 'MiniMax-Text-01', label: 'MiniMax Text-01', group: 'minimax' },
-  // 通义千问 Qwen
-  { value: 'qwen-plus', label: 'Qwen Plus', group: 'qwen' },
-  { value: 'qwen-max',  label: 'Qwen Max',  group: 'qwen' },
-  // GLM
-  { value: 'glm-5',  label: 'GLM-5',  group: 'glm' },
-  { value: 'glm-4.7', label: 'GLM-4.7', group: 'glm' },
-  // Kimi
-  { value: 'kimi-k2.5', label: 'Kimi K2.5', group: 'kimi' },
-  // Claude
-  { value: 'claude-sonnet-4-20250514',  label: 'Claude Sonnet 4',  group: 'claude' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', group: 'claude' },
+  { value: 'qwen3-coder-next',     label: 'Qwen3 Coder Next', group: 'qwen-coding' },
+  { value: 'qwen3-coder-plus',     label: 'Qwen3 Coder Plus', group: 'qwen-coding' },
+  { value: 'glm-4.7',              label: 'GLM-4.7',            group: 'glm' },
 ]
 
 const GROUP_LABELS: Record<string, string> = {
   'qwen-coding': '百炼 Coding Plan',
   'minimax': 'MiniMax',
-  'qwen': '通义千问 Qwen',
-  'claude': 'Claude',
-  'glm': '智谱 GLM',
   'kimi': 'Kimi',
+  'glm': '智谱 GLM',
 }
 
 const GROUP_COLORS: Record<string, string> = {
   'qwen-coding': '#6366f1',
   'minimax': '#f59e0b',
-  'qwen': '#10b981',
-  'claude': '#ec4899',
-  'glm': '#6d28d9',
   'kimi': '#0ea5e9',
+  'glm': '#6d28d9',
 }
 
 export default function ModelSelector({ value, onChange, options = DEFAULT_MODEL_OPTIONS }: ModelSelectorProps) {
@@ -212,7 +199,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 1000,
+    zIndex: 2050,
   },
   groupFilter: {
     display: 'flex',

@@ -373,7 +373,7 @@ function AppContent() {
     }
     setConversations(prev => [conv, ...prev])
     setActiveId(id)
-    setPage('chat')
+    // 不自动跳转，让用户手动进入会话页面
 
     // 立即保存到后端
     if (isElectron()) {

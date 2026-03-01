@@ -4,9 +4,12 @@
   "description": "AI Desktop Agent powered by Claude",
   "main": "electron/main.js",
   "scripts": {
+    "dev:proxy": "node proxy-service.js",
     "dev:vite": "vite",
     "dev:electron": "npx wait-on http://localhost:5173 && electron .",
     "dev": "node scripts/dev-runner.js",
+    "dev:all": "concurrently -k \"pnpm dev:proxy\" \"pnpm dev:vite\" \"pnpm dev:electron\"",
+    "start": "concurrently -k \"pnpm dev:proxy\" \"pnpm dev:vite\" \"pnpm dev:electron\"",
     "build": "vite build && electron-builder",
     "typecheck": "tsc --noEmit"
   },
