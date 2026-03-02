@@ -61,7 +61,7 @@ interface ElectronAPI {
   saveSettings: (s: Partial<Settings>) => Promise<{ ok: boolean }>;
   pickFolder: () => Promise<string | null>;
   agentRun: (p: { messages: Pick<Message, 'role' | 'content'>[]; workspace: string }) => Promise<{ result?: unknown; error?: string }>;
-  chatMessage: (p: { model: string; messages: { role: string; content: string }[] }) => Promise<{ ok: boolean; status?: number; data?: any; error?: string }>;
+  chatMessage: (p: { model: string; messages: { role: string; content: string }[] }) => Promise<{ ok: boolean; status?: number; data?: unknown; error?: string }>;
   agentStop: () => Promise<{ ok: boolean }>;
   onAgentEvent: (cb: (ev: AgentEvent) => void) => () => void;
   fsList: (dir: string) => Promise<{ name: string; isDir: boolean; path: string }[]>;
@@ -70,19 +70,19 @@ interface ElectronAPI {
   setAutoLaunch: (enabled: boolean) => Promise<{ ok: boolean }>;
   getAutoLaunch: () => Promise<{ openAtLogin: boolean }>;
   getProxyPort: () => Promise<number>;
-  getProxyConfig: () => Promise<any>;
-  saveProxyConfig: (p: any) => Promise<{ ok: boolean; error?: string }>;
-  testProxyProvider: (p: any) => Promise<{ ok: boolean; content?: string; error?: string }>;
-  getAvailableModels: () => Promise<any[]>;
+  getProxyConfig: () => Promise<ProxyConfigStatus>;
+  saveProxyConfig: (p: { provider: string; apiKey?: string; baseUrl?: string }) => Promise<{ ok: boolean; error?: string }>;
+  testProxyProvider: (p: { provider: string }) => Promise<{ ok: boolean; content?: string; error?: string }>;
+  getAvailableModels: () => Promise<ModelOption[]>;
   checkAvailableAgents: () => Promise<string[]>;
-  testAgent: (params: any) => Promise<{ success: boolean; content?: string; error?: string }>;
-  selectBestAgent: () => Promise<{ success: boolean; agent?: string; error?: string }>;
+  testAgent: (params: AgentTestParams) => Promise<AgentTestResult>;
+  selectBestAgent: () => Promise<AgentSelectionResult>;
   authCheck: () => Promise<{ userName: string | null }>;
   authLogin: (userName: string) => Promise<{ ok: boolean }>;
   authLogout: () => Promise<{ ok: boolean }>;
-  getAccounts: () => Promise<any[]>;
-  createAccount: (userName: string, userAvatar?: string) => Promise<{ ok: boolean; error?: string; account?: any }>;
-  getAccountInfo: (userName: string) => Promise<any | null>;
+  getAccounts: () => Promise<UserAccount[]>;
+  createAccount: (userName: string, userAvatar?: string) => Promise<{ ok: boolean; error?: string; account?: UserAccount }>;
+  getAccountInfo: (userName: string) => Promise<UserAccount | null>;
   deleteAccount: (userName: string) => Promise<{ ok: boolean; error?: string }>;
   updateAvatar: (userName: string, userAvatar: string) => Promise<{ ok: boolean; error?: string }>;
   convList: () => Promise<StoredConversation[]>;
@@ -90,14 +90,50 @@ interface ElectronAPI {
   convDelete: (id: string) => Promise<{ ok: boolean }>;
 }
 
+// Type definitions for proxy and account management
+interface ProxyConfigStatus {
+  minimax?: { enabled: boolean; baseUrl?: string }
+  qwen?: { enabled: boolean; baseUrl?: string }
+  [key: string]: { enabled: boolean; baseUrl?: string } | undefined
+}
+
+interface ModelOption {
+  id: string
+  name: string
+  provider: string
+}
+
+interface UserAccount {
+  userName: string
+  userAvatar?: string
+  userPlan?: string
+  createdAt?: Date
+}
+
+interface AgentTestParams {
+  model: string
+  messages?: { role: string; content: string }[]
+}
+
+interface AgentTestResult {
+  success: boolean
+  content?: string
+  error?: string
+}
+
+interface AgentSelectionResult {
+  success: boolean
+  agent?: string
+  error?: string
+}
+
 // ─── 全局事件总线（替代随机 interval） ────────────────────────────────────────
 
 let agentEventListeners: Array<(ev: AgentEvent) => void> = []
-let stopRequested = false
 
 function emitAgentEvent(ev: AgentEvent) {
   agentEventListeners.forEach(cb => {
-    try { cb(ev) } catch (e) { console.error('[Mock] Event listener error:', e) }
+    try { cb(ev) } catch { console.error('[Mock] Event listener error') }
   })
 }
 
@@ -132,7 +168,7 @@ const createMockElectron = (): ElectronAPI => {
     if (stored) {
       settings = { ...settings, ...JSON.parse(stored) }
     }
-  } catch (e) {
+  } catch {
     console.warn('[Mock] 无法加载存储的设置，使用默认值')
   }
 
@@ -143,7 +179,7 @@ const createMockElectron = (): ElectronAPI => {
       settings = { ...settings, ...newSettings }
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-      } catch (e) {
+      } catch {
         console.warn('[Mock] 无法保存设置到 localStorage')
       }
       return { ok: true }
@@ -162,14 +198,13 @@ const createMockElectron = (): ElectronAPI => {
     },
 
     // Chat 模式 IPC 调用（浏览器模式下通过 chatApi.ts 走 proxy）
-    chatMessage: async ({ model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
+    chatMessage: async () => {
       // 浏览器模式下，chatMessage 应该走 callViaBrowserProxy，而不是这里
       // 这里返回错误，让 chatApi.ts 处理
       return { ok: false, error: '请使用浏览器代理路径' }
     },
 
     agentStop: async () => {
-      stopRequested = true
       emitAgentEvent({ type: 'stopped' })
       return { ok: true }
     },
@@ -199,7 +234,7 @@ const createMockElectron = (): ElectronAPI => {
     },
 
     // Auto launch
-    setAutoLaunch: async (enabled: boolean) => {
+    setAutoLaunch: async () => {
       return { ok: true }
     },
     getAutoLaunch: async () => {
@@ -211,12 +246,15 @@ const createMockElectron = (): ElectronAPI => {
       return 8080
     },
     getProxyConfig: async () => {
-      return { provider: '', apiKey: '' }
+      return {
+        minimax: { configured: false, maskedKey: '', baseUrl: '' },
+        qwen: { configured: false, maskedKey: '', baseUrl: '' },
+      }
     },
-    saveProxyConfig: async (p: any) => {
+    saveProxyConfig: async () => {
       return { ok: true }
     },
-    testProxyProvider: async (p: any) => {
+    testProxyProvider: async () => {
       return { ok: true, content: 'Mock OK' }
     },
 
@@ -238,7 +276,7 @@ const createMockElectron = (): ElectronAPI => {
     checkAvailableAgents: async () => {
       return []
     },
-    testAgent: async (params: any) => {
+    testAgent: async () => {
       return { success: true, content: 'Mock OK' }
     },
     selectBestAgent: async () => {
@@ -282,7 +320,7 @@ const createMockElectron = (): ElectronAPI => {
         return { ok: false, error: '用户名不能为空' }
       }
       const stored = localStorage.getItem('mock-accounts')
-      const accounts: any[] = stored ? JSON.parse(stored) : []
+      const accounts: UserAccount[] = stored ? JSON.parse(stored) : []
       if (accounts.some(a => a.userName === userName.trim())) {
         return { ok: false, error: '该用户名已存在' }
       }
@@ -298,13 +336,13 @@ const createMockElectron = (): ElectronAPI => {
 
     getAccountInfo: async (userName: string) => {
       const stored = localStorage.getItem('mock-accounts')
-      const accounts: any[] = stored ? JSON.parse(stored) : []
+      const accounts: UserAccount[] = stored ? JSON.parse(stored) : []
       return accounts.find(a => a.userName === userName) || null
     },
 
     deleteAccount: async (userName: string) => {
       const stored = localStorage.getItem('mock-accounts')
-      const accounts: any[] = stored ? JSON.parse(stored) : []
+      const accounts: UserAccount[] = stored ? JSON.parse(stored) : []
       const filtered = accounts.filter(a => a.userName !== userName)
       if (filtered.length === accounts.length) {
         return { ok: false, error: '账号不存在' }
@@ -318,7 +356,7 @@ const createMockElectron = (): ElectronAPI => {
 
     updateAvatar: async (userName: string, userAvatar: string) => {
       const stored = localStorage.getItem('mock-accounts')
-      const accounts: any[] = stored ? JSON.parse(stored) : []
+      const accounts: UserAccount[] = stored ? JSON.parse(stored) : []
       const idx = accounts.findIndex(a => a.userName === userName)
       if (idx === -1) {
         return { ok: false, error: '账号不存在' }
@@ -346,7 +384,7 @@ const createMockElectron = (): ElectronAPI => {
         if (idx >= 0) convs[idx] = conv
         else convs.unshift(conv)
         localStorage.setItem(key, JSON.stringify(convs))
-      } catch (e) { console.warn('[Mock] convSave failed', e) }
+      } catch { console.warn('[Mock] convSave failed') }
       return { ok: true }
     },
 
@@ -356,18 +394,18 @@ const createMockElectron = (): ElectronAPI => {
         const key = `mock-conv-${userName}`
         const convs: StoredConversation[] = JSON.parse(localStorage.getItem(key) || '[]')
         localStorage.setItem(key, JSON.stringify(convs.filter(c => c.id !== id)))
-      } catch (e) { console.warn('[Mock] convDelete failed', e) }
+      } catch { console.warn('[Mock] convDelete failed') }
       return { ok: true }
     },
   }
 }
 
 // 仅在浏览器中且 window.electron 不存在时注入 mock
-if (typeof window !== 'undefined' && !(window as any).electron) {
+if (typeof window !== 'undefined' && !('electron' in window)) {
   const mock = createMockElectron()
   // 标记为 mock，供 isRealElectron() 判断（区分真实 Electron 和浏览器）
-  ;(mock as any).__isMock = true
-  ;(window as any).electron = mock
+  ;(mock as unknown as { __isMock: boolean }).__isMock = true
+  ;(window as unknown as { electron: typeof mock }).electron = mock
 } else if (typeof window !== 'undefined') {
   console.log('[Electron] 使用真实 Electron API')
 }

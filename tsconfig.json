@@ -24,11 +24,11 @@
       "@ui/*": ["src/components/ui/*"],
       "@pages/*": ["src/components/pages/*"],
       "@modals/*": ["src/components/modals/*"],
-      "@types": ["src/types"],
+      "@types": ["src/types.ts"],
       "@contexts/*": ["src/contexts/*"],
       "@hooks/*": ["src/hooks/*"],
       "@utils/*": ["src/utils/*"],
-      "@config": ["src/config"]
+      "@config": ["src/config.ts"]
     }
   },
   "include": ["src"]

@@ -45,7 +45,6 @@ export default function ChatPage({ conversation, settings, mode, availableModels
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [statusText, setStatusText] = useState('')
-  const [workspace, setWorkspace] = useState(settings.workspace || '未设置工作目录')
   const [workspaceName, setWorkspaceName] = useState('未设置工作目录')
   const bottomRef = useRef<HTMLDivElement>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
@@ -106,16 +105,6 @@ export default function ChatPage({ conversation, settings, mode, availableModels
       setWorkspaceName(parts[parts.length - 1] || settings.workspace)
     }
   }, [settings.workspace])
-
-  // 选择工作目录（仅首页，会话页不可修改）
-  const handleSelectWorkspace = async () => {
-    if (!isElectron()) return
-    const newWorkspace = await window.electron.pickFolder()
-    if (newWorkspace) {
-      await window.electron.saveSettings({ workspace: newWorkspace })
-      window.dispatchEvent(new CustomEvent('workspace-changed', { detail: newWorkspace }))
-    }
-  }
 
   const messages = conversation.messages
 

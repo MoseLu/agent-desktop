@@ -64,9 +64,25 @@ export async function sendChatMessage(
 
 // ── IPC 代理调用（Electron 生产模式）──────────────────────────────────────────
 
+interface ChatMessageResult {
+  ok: boolean
+  status?: number
+  error?: string
+  data?: {
+    choices?: Array<{
+      message?: {
+        content?: string
+      }
+    }>
+    error?: {
+      message?: string
+    }
+  }
+}
+
 async function callViaIpc(model: string, messages: ChatMessage[]): Promise<string> {
   console.log('[ChatAPI] callViaIpc:', { model })
-  const result = await (window as any).electron.chatMessage({ model, messages })
+  const result = await window.electron.chatMessage({ model, messages }) as unknown as ChatMessageResult
   console.log('[ChatAPI] IPC result:', result)
 
   if (!result.ok) {
@@ -109,11 +125,11 @@ async function callViaBrowserProxy(
     console.log('[ChatAPI] Response:', res.status, res.statusText)
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as any
+      const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
       throw new Error(`API 错误 (${res.status}): ${err.error?.message ?? res.statusText}`)
     }
 
-    const data = await res.json() as any
+    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
     return data.choices?.[0]?.message?.content ?? ''
   } catch (err) {
     console.error('[ChatAPI] Fetch error:', err)

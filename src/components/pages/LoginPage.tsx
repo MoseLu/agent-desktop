@@ -7,10 +7,6 @@ interface Props {
   onLogin: (userName: string) => void
 }
 
-interface AccountWithSelected extends UserAccount {
-  selected?: boolean
-}
-
 export default function LoginPage({ onLogin }: Props) {
   const [accounts, setAccounts] = useState<UserAccount[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -30,8 +26,8 @@ export default function LoginPage({ onLogin }: Props) {
     try {
       const accs = await window.electron.getAccounts()
       setAccounts(accs)
-    } catch (err) {
-      console.error('Failed to load accounts:', err)
+    } catch {
+      console.error('Failed to load accounts')
     }
   }
 
@@ -58,7 +54,7 @@ export default function LoginPage({ onLogin }: Props) {
         setError(result.error || '创建失败')
         setCreating(false)
       }
-    } catch (err) {
+    } catch {
       setError('创建失败，请重试')
       setCreating(false)
     }
@@ -101,7 +97,7 @@ export default function LoginPage({ onLogin }: Props) {
       } else {
         setError(result.error || '删除失败')
       }
-    } catch (err) {
+    } catch {
       setError('删除失败')
     }
   }

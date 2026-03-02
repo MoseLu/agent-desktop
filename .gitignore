@@ -38,6 +38,9 @@ desktop.ini
 tmp/
 temp/
 
+# OMC framework
+.omc/
+
 # Lock files (keep only one)
 # package-lock.json
 # yarn.lock

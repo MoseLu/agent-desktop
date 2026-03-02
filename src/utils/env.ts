@@ -35,7 +35,7 @@ export function isElectron(): boolean {
  * 浏览器中 electron-mock 会设置 __isMock 标记以区分。
  */
 export function isRealElectron(): boolean {
-  return isElectron() && !(window.electron as any).__isMock
+  return isElectron() && !('electron' in window && '__isMock' in window.electron)
 }
 
 /**

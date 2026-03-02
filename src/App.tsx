@@ -177,7 +177,9 @@ function AppContent() {
       // 浏览器模式：加载 mock 历史
       window.electron.convList().then(records => {
         setConversations(records.map(deserializeConv))
-      }).catch(() => {})
+      }).catch(err => {
+        console.error('Failed to load conversations:', err)
+      })
       return
     }
 

@@ -128,6 +128,45 @@ export interface AgentEvent {
 /** chat = 纯对话，浏览器/桌面均支持；code = 完整 agent，仅 Electron */
 export type AppMode = 'chat' | 'code'
 
+// Proxy and API related types
+export interface ProxyConfigStatus {
+  minimax?: { enabled: boolean; baseUrl?: string }
+  qwen?: { enabled: boolean; baseUrl?: string }
+  [key: string]: { enabled: boolean; baseUrl?: string } | undefined
+}
+
+export interface ModelOption {
+  id: string
+  name: string
+  provider: string
+}
+
+// Account related types
+export interface UserAccount {
+  userName: string
+  userAvatar?: string
+  userPlan?: string
+  createdAt?: Date
+}
+
+// Agent test related types
+export interface AgentTestParams {
+  model: string
+  messages?: { role: string; content: string }[]
+}
+
+export interface AgentTestResult {
+  success: boolean
+  content?: string
+  error?: string
+}
+
+export interface AgentSelectionResult {
+  success: boolean
+  agent?: string
+  error?: string
+}
+
 declare global {
   interface Window {
     electron: {

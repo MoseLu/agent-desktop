@@ -6,16 +6,13 @@ import { UserMenu } from './UserMenu'
 import IconButton from '@ui/IconButton'
 import { ExpandIcon, LogoIcon } from '@ui'
 
-interface CollapsedSidebarProps extends SidebarWithMenuProps {}
-
 export function CollapsedSidebar({
   onToggleExpand,
   userMenuOpen,
   onToggleUserMenu,
-  onCloseUserMenu,
   userMenuContainerRef,
   ...props
-}: CollapsedSidebarProps) {
+}: SidebarWithMenuProps) {
   const [logoHovered, setLogoHovered] = useState(false)
 
   return (

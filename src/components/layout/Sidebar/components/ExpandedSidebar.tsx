@@ -7,16 +7,13 @@ import { UserMenu } from './UserMenu'
 import IconButton from '@ui/IconButton'
 import { LogoIcon, CollapseIcon } from '@ui'
 
-interface ExpandedSidebarProps extends SidebarWithMenuProps {}
-
 export function ExpandedSidebar({
   onToggleExpand,
   userMenuOpen,
   onToggleUserMenu,
-  onCloseUserMenu,
   userMenuContainerRef,
   ...props
-}: ExpandedSidebarProps) {
+}: SidebarWithMenuProps) {
   const [taskRecordOpen, setTaskRecordOpen] = useState(true)
 
   return (

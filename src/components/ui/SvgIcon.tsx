@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 
 export interface SvgIconProps extends Omit<React.SVGProps<SVGSVGElement>, 'rotated'> {
   /** 图标名称（对应 SVG 文件名） */

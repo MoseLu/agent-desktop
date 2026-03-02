@@ -1,4 +1,4 @@
-import React, { forwardRef, Ref } from 'react'
+import React, { forwardRef } from 'react'
 import { Button } from 'antd'
 import type { ButtonProps } from 'antd'
 
@@ -43,7 +43,6 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconB
     variant = 'borderless',
     icon,
     onClick,
-    title,
     disabled = false,
     style,
     active = false,

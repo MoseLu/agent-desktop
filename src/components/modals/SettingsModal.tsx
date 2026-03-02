@@ -7,9 +7,6 @@ import { SunIcon, MoonIcon, DesktopIcon, AlarmCheckIcon } from '@ui/icons'
 import Tooltip from '@ui/Tooltip'
 import { message } from '@ui/Message'
 
-// 模型列表预留 - 后续从后端 API 获取
-const DEFAULT_MODELS: Array<{ id: string; label: string }> = []
-
 type SettingsTab = 'account' | 'general' | 'desktop-general' | 'notifications' | 'scheduled-tasks' | 'proxy'
 
 interface Props {
@@ -510,7 +507,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
             } else {
               message.error(result.error || '保存失败', 3000)
             }
-          } catch (err) { message.error('保存失败', 3000) }
+          } catch { message.error('保存失败', 3000) }
         }
 
         const testProvider = async (provider: string) => {
@@ -551,7 +548,7 @@ export default function SettingsModal({ initial, onSave, onClose, onScheduledTas
 
             {/* 各 provider 配置 */}
             {providers.map(p => {
-              const status = (proxyConfig as any)[p.id] as ProxyConfigStatus[keyof ProxyConfigStatus] | undefined
+              const status = proxyConfig[p.id as keyof ProxyConfigStatus]
               const isTesting = proxyTesting[p.id]
               return (
                 <div key={p.id} style={proxyStyles.providerCard}>
@@ -974,34 +971,6 @@ function SettingsIcon() {
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
       <circle cx="9" cy="9" r="3.5" stroke="currentColor" strokeWidth="1.3" />
       <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.3 3.3l1.4 1.4M13.3 13.3l1.4 1.4M3.3 14.7l1.4-1.4M13.3 4.7l1.4-1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function BillingIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
-      <line x1="2" y1="7" x2="16" y2="7" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="13" cy="11" r="1.5" fill="currentColor" />
-    </svg>
-  )
-}
-
-function PointsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M9 5v5l3 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function ClockIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M9 5v4l3 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   )
 }

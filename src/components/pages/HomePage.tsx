@@ -7,7 +7,6 @@ import ChatInputPlaceholder from '@ui/ChatInputPlaceholder'
 import Tooltip from '@ui/Tooltip'
 import ModelSelector from '@ui/ModelSelector'
 import { isElectron } from '@utils/env'
-import { sendChatMessage } from '@utils/chatApi'
 import { message } from '@ui/Message'
 import {
   AttachIcon,
@@ -28,76 +27,6 @@ interface Props {
   availableModels?: ModelOption[]
   onSettingsChange?: (s: Partial<Settings>) => void
   onStartTask: (prompt?: string, smartMode?: boolean) => void
-}
-
-// 自定义 SVG 图标组件
-function AlarmClockIcon({ size = 14, color = '#8B5CF6' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* 闹钟主体 */}
-      <circle cx="12" cy="13" r="8" stroke={color} strokeWidth="2" fill="none" />
-      {/* 闹钟腿 */}
-      <path d="M7 19L5 21" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M17 19L19 21" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* 闹钟铃铛 */}
-      <path d="M8 5L10 3" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M16 5L14 3" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* 时针 */}
-      <path d="M12 13V9" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* 分针 */}
-      <path d="M12 13L15 13" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function DocumentIcon({ size = 14, color = '#F97316' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* 文档轮廓 */}
-      <path d="M6 2L18 2L18 22L6 22L6 2Z" stroke={color} strokeWidth="2" fill="none" />
-      {/* 折角 */}
-      <path d="M6 2L6 8L12 8L12 2" stroke={color} strokeWidth="2" fill="none" />
-      {/* 文档线条 */}
-      <path d="M8 12L16 12" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M8 16L16 16" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M8 20L14 20" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function RadarIcon({ size = 14, color = '#EF4444' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* 雷达外圈 */}
-      <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" fill="none" />
-      {/* 雷达中圈 */}
-      <circle cx="12" cy="12" r="5" stroke={color} strokeWidth="1.5" fill="none" opacity="0.6" />
-      {/* 雷达内圈 */}
-      <circle cx="12" cy="12" r="2" stroke={color} strokeWidth="1.5" fill="none" opacity="0.3" />
-      {/* 雷达扫描线 */}
-      <path d="M12 12L18 6" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* 雷达底座 */}
-      <path d="M12 21L12 17" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M8 21L16 21" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function WhiteboardIcon({ size = 14, color = '#3B82F6' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* 白板主体 */}
-      <rect x="3" y="3" width="18" height="14" rx="2" stroke={color} strokeWidth="2" fill="none" />
-      {/* 白板支架 */}
-      <path d="M7 17L5 21" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M17 17L19 21" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M10 21L14 21" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* 白板内容线 */}
-      <path d="M6 7L14 7" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M6 10L12 10" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M6 13L10 13" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
 }
 
 const QUICK_CHIPS = [
@@ -126,7 +55,6 @@ export default function HomePage({ settings, availableModels, onSettingsChange, 
   const [isSelectingFolder, setIsSelectingFolder] = useState(false)
   const [isHoveringWorkspace, setIsHoveringWorkspace] = useState(false)
   const [workspace, setWorkspace] = useState(settings.workspace || '未设置工作目录')
-  const [isCompleting, setIsCompleting] = useState(false) // AI 补全加载状态
   const workspaceBtnRef = useRef<HTMLDivElement>(null)
   const efficientModeBtnRef = useRef<HTMLButtonElement>(null)
   const omnipotentModeBtnRef = useRef<HTMLButtonElement>(null)
@@ -203,13 +131,6 @@ export default function HomePage({ settings, availableModels, onSettingsChange, 
     }
   }
 
-  const formatModelName = (modelName: string) => {
-    if (modelName.includes('sonnet')) return 'Claude Sonnet'
-    if (modelName.includes('opus')) return 'Claude Opus'
-    if (modelName.includes('haiku')) return 'Claude Haiku'
-    return modelName
-  }
-
   const workspaceName = workspace || '未设置工作目录'
 
   return (
@@ -261,7 +182,6 @@ export default function HomePage({ settings, availableModels, onSettingsChange, 
             const topWidth = 320      // 上底宽度（标题宽度约 300-350px）
             const bottomWidth = 800   // 下底宽度（输入框宽度约 800px）
             const rowGap = 6          // 行间距
-            const containerHeight = (totalRows - 1) * rowGap  // 实际高度：66px
             const pointsPerRow = 20   // 每行固定点数
             
             for (let row = 0; row < totalRows; row++) {

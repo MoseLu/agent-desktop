@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react'
+import React, { useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react'
 
 export interface ChatInputProps {
   value: string
@@ -71,13 +71,6 @@ export default function ChatInput({
       }
     } else if (onKeyDown) {
       onKeyDown(e)
-    }
-  }
-
-  const handleSubmit = () => {
-    const trimmed = value.trim()
-    if (trimmed && !disabled) {
-      onSubmit(trimmed)
     }
   }
 

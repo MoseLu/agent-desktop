@@ -3,13 +3,6 @@ import { InfoCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, Exclamati
 
 export type MessageType = 'info' | 'success' | 'error' | 'warning'
 
-interface MessageProps {
-  type?: MessageType
-  content: string
-  duration?: number
-  onClose?: () => void
-}
-
 interface MessageInstance {
   info: (content: string, duration?: number) => void
   success: (content: string, duration?: number) => void
@@ -98,12 +91,12 @@ const createMessage = () => {
   const render = async () => {
     if (messageContainer) {
       // 使用 React 18 的 createRoot
-      const root = (messageContainer as any)._reactRoot
+      const root = (messageContainer as unknown as { _reactRoot?: ReturnType<Awaited<typeof import('react-dom/client')['createRoot']>> })._reactRoot
       if (!root) {
         const { createRoot } = await import('react-dom/client')
-        ;(messageContainer as any)._reactRoot = createRoot(messageContainer)
+        ;(messageContainer as unknown as { _reactRoot: ReturnType<typeof createRoot> })._reactRoot = createRoot(messageContainer)
       }
-      ;(messageContainer as any)._reactRoot.render(
+      root.render(
         <MessageContainer
           messages={messageQueue}
           onRemove={(id) => {
