@@ -1,14 +1,17 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
-          }
-        ]
-      }
-    ]
-  }
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.minimaxi.com/anthropic",
+    "ANTHROPIC_MODEL": "MiniMax-M2.5"
+  },
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    }
+  },
+  "permissions": {
+    "read": ["**/*"],
+    "write": ["src/**/*", "electron/**/*", "public/**/*"]
+  },
+  "customInstructions": "你是一位专业的 AI 桌面应用开发助手，专注于 Electron + React + TypeScript 开发。你熟悉 MiniMax、Qwen 等大模型 API 集成，擅长代码质量优化和类型安全。"
 }
